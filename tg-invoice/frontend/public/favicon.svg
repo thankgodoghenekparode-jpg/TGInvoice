@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TG Invoice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2563EB" />
+      <stop offset="1" stop-color="#1E40AF" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect x="154" y="120" width="205" height="271" rx="28" fill="#ffffff" />
+  <path d="M287 120h72v72z" fill="#DBEAFE" />
+  <rect x="192" y="185" width="129" height="23" rx="11.5" fill="#93C5FD" />
+  <rect x="192" y="236" width="85" height="23" rx="11.5" fill="#93C5FD" />
+  <rect x="192" y="288" width="108" height="23" rx="11.5" fill="#93C5FD" />
+  <rect x="192" y="303" width="67" height="38" rx="19" fill="#2563EB" />
+</svg>

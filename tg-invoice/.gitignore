@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Environment files — NEVER commit real secrets.
+# .env.example is committed on purpose so setup is self-documenting.
+.env
+.env.*
+!.env.example
+
+# Uploaded tenant logos (local storage driver writes here)
+uploads/
+backend/uploads/
+
+# Logs and caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+vite.config.js.timestamp-*
+.oxlintcache
+coverage/
+
+# Editors and OS cruft
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

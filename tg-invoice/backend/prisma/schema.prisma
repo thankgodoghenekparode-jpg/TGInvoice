@@ -1,0 +1,563 @@
+// TG Invoice — Prisma schema
+// Multi-tenant SaaS: shared database, logical tenant isolation via tenantId.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+// Platform-level state for a business or an account. A SUSPENDED tenant is
+// unreachable by every one of its members; a SUSPENDED user cannot sign in.
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  VOID
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  POS
+  CHEQUE
+  ONLINE
+  OTHER
+}
+
+enum ProductCategory {
+  METER_INSTALLATION
+  METER_RELOCATION
+  ENERGY_SERVICE
+  TECHNICAL_SERVICE
+  CONSULTATION
+  EQUIPMENT
+  OTHER
+}
+
+enum DocumentKind {
+  CUSTOMER
+  QUOTATION
+  INVOICE
+  RECEIPT
+}
+
+// ─────────────────────────────────────────────
+// Identity & Tenancy
+// ─────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String
+  email           String    @unique
+  passwordHash    String
+  avatar          String?
+  emailVerified   Boolean   @default(false)
+  isPlatformAdmin Boolean   @default(false) // platform operator — granted ONLY by db:superadmin or another platform admin
+  status          AccountStatus @default(ACTIVE) // SUSPENDED blocks sign-in and every authenticated request
+  suspendedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships     Membership[]
+  refreshTokens   RefreshToken[]
+  passwordResets  PasswordResetToken[]
+  emailVerifs     EmailVerificationToken[]
+  invitations     Invitation[]       @relation("InvitedBy")
+  createdQuotations Quotation[]      @relation("QuotationCreator")
+  createdInvoices   Invoice[]        @relation("InvoiceCreator")
+  createdPayments   Payment[]        @relation("PaymentCreator")
+  createdReceipts   Receipt[]        @relation("ReceiptCreator")
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+
+  @@index([email])
+}
+
+model Tenant {
+  id             String        @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String        @unique
+  logo           String?
+  status           AccountStatus @default(ACTIVE) // SUSPENDED = platform-suspended: no member can reach it
+  accessExpiresAt   DateTime?    // optional tenant-level access expiry
+  suspendedAt       DateTime?     // when auto-suspended (e.g. due to expiry)
+  suspensionReason  String?      // reason for suspension (auto or manual)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  memberships       Membership[]
+  invitations       Invitation[]
+  customers         Customer[]
+  products          Product[]
+  quotations        Quotation[]
+  invoices          Invoice[]
+  payments          Payment[]
+  receipts          Receipt[]
+  companySettings   CompanySettings?
+  auditLogs         AuditLog[]
+  sequences         DocumentSequence[]
+  refreshTokens     RefreshToken[]
+  passwordResets    PasswordResetToken[]
+  emailVerifs       EmailVerificationToken[]
+  notifications     Notification[]
+}
+
+model Membership {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  tenantId       String           @db.Uuid
+  role           Role             @default(STAFF)
+  status           MembershipStatus @default(ACTIVE)
+  accessExpiresAt   DateTime?       // optional per-member access expiry (UTC)
+  suspendedAt       DateTime?        // timestamp when auto-suspended due to expiry
+  suspensionReason  String?         // reason for suspension (auto or manual)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([accessExpiresAt])
+  @@index([suspendedAt])
+}
+
+model Invitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @db.Uuid
+  email       String
+  role        Role             @default(STAFF)
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String           @db.Uuid
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy User   @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tenantId  String?   @db.Uuid // last active tenant for this session
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tenantId  String?   @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tenantId  String?   @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────
+// Business data (tenant-owned)
+// ─────────────────────────────────────────────
+
+model Customer {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  customerCode String
+  name        String
+  companyName String?
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  taxId       String?
+  notes       String?
+  isDemo      Boolean  @default(false) // true = generated by the demo seeder; removable via `npm run db:clear-demo`
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quotations Quotation[]
+  invoices   Invoice[]
+  payments   Payment[]
+  receipts   Receipt[]
+
+  @@unique([tenantId, customerCode])
+  @@index([tenantId])
+  @@index([tenantId, name])
+}
+
+model Product {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @db.Uuid
+  name        String
+  description String?
+  category    ProductCategory @default(OTHER)
+  unit        String          @default("unit")
+  unitPrice   Decimal         @default(0) @db.Decimal(14, 2)
+  taxRate     Decimal         @default(0) @db.Decimal(5, 2)
+  active      Boolean         @default(true)
+  isDemo      Boolean         @default(false) // generated by the demo seeder
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quotationItems  QuotationItem[]
+  invoiceItems    InvoiceItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+}
+
+model DocumentSequence {
+  id       String      @id @default(uuid()) @db.Uuid
+  tenantId String      @db.Uuid
+  kind     DocumentKind
+  prefix   String
+  next     Int         @default(1)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kind])
+}
+
+model CompanySettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @unique @db.Uuid
+
+  businessName       String?
+  logo               String?
+  address            String?
+  phone              String?
+  email              String?
+  website            String?
+  taxId              String?
+  country            String?  @default("Nigeria")
+
+  currency           String   @default("NGN")
+  currencySymbol     String   @default("₦")
+  currencyPosition   String   @default("prefix") // prefix | suffix
+  currencyDecimals   Int      @default(2)
+
+  bankName           String?
+  accountName        String?
+  accountNumber      String?
+  paymentInstructions String?
+
+  invoicePrefix      String   @default("INV")
+  quotationPrefix    String   @default("QT")
+  receiptPrefix      String   @default("REC")
+
+  defaultTaxRate     Decimal  @default(0) @db.Decimal(5, 2)
+  defaultCurrency    String   @default("NGN")
+
+  defaultInvoiceNotes  String?
+  defaultQuotationTerms String?
+  defaultReceiptNotes   String?
+
+  onboardingComplete Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Quotation {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @db.Uuid
+  customerId     String          @db.Uuid
+  quotationNumber String
+  quotationDate  DateTime        @default(now())
+  validUntil     DateTime?
+  reference      String?
+  status         QuotationStatus @default(DRAFT)
+  subtotal       Decimal         @default(0) @db.Decimal(14, 2)
+  discountAmount Decimal         @default(0) @db.Decimal(14, 2)
+  taxAmount      Decimal         @default(0) @db.Decimal(14, 2)
+  total          Decimal         @default(0) @db.Decimal(14, 2)
+  notes          String?
+  terms          String?
+  createdById    String?         @db.Uuid
+  isDemo         Boolean         @default(false) // generated by the demo seeder
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy User?           @relation("QuotationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items    QuotationItem[]
+  invoices Invoice[]
+
+  @@unique([tenantId, quotationNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId])
+}
+
+model QuotationItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  quotationId    String       @db.Uuid
+  productId      String?      @db.Uuid
+  description    String
+  quantity       Decimal      @db.Decimal(12, 2)
+  unitPrice      Decimal      @db.Decimal(14, 2)
+  discountType   DiscountType?
+  discountValue  Decimal      @default(0) @db.Decimal(14, 2)
+  discountAmount Decimal      @default(0) @db.Decimal(14, 2)
+  taxRate        Decimal      @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal      @default(0) @db.Decimal(14, 2)
+  amount         Decimal      @default(0) @db.Decimal(14, 2)
+  position       Int          @default(0)
+
+  quotation  Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product    Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([quotationId])
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  customerId    String        @db.Uuid
+  quotationId   String?       @db.Uuid
+  invoiceNumber String
+  invoiceDate   DateTime      @default(now())
+  dueDate       DateTime?
+  reference     String?
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal       @default(0) @db.Decimal(14, 2)
+  discountAmount Decimal      @default(0) @db.Decimal(14, 2)
+  taxAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  total         Decimal       @default(0) @db.Decimal(14, 2)
+  amountPaid    Decimal       @default(0) @db.Decimal(14, 2)
+  balanceDue    Decimal       @default(0) @db.Decimal(14, 2)
+  notes         String?
+  terms         String?
+  voidReason    String?
+  createdById   String?       @db.Uuid
+  isDemo        Boolean       @default(false) // generated by the demo seeder
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer    Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quotation   Quotation?      @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  createdBy   User?           @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items       InvoiceItem[]
+  payments    Payment[]
+  receipts    Receipt[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId])
+}
+
+model InvoiceItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  invoiceId      String       @db.Uuid
+  productId      String?      @db.Uuid
+  description    String
+  quantity       Decimal      @db.Decimal(12, 2)
+  unitPrice      Decimal      @db.Decimal(14, 2)
+  discountType   DiscountType?
+  discountValue  Decimal      @default(0) @db.Decimal(14, 2)
+  discountAmount Decimal      @default(0) @db.Decimal(14, 2)
+  taxRate        Decimal      @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal      @default(0) @db.Decimal(14, 2)
+  amount         Decimal      @default(0) @db.Decimal(14, 2)
+  position       Int          @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id           String        @id @default(uuid()) @db.Uuid
+  tenantId     String        @db.Uuid
+  invoiceId    String        @db.Uuid
+  customerId   String        @db.Uuid
+  amount       Decimal       @db.Decimal(14, 2)
+  paymentDate  DateTime      @default(now())
+  paymentMethod PaymentMethod @default(BANK_TRANSFER)
+  reference    String?
+  notes        String?
+  createdById  String?       @db.Uuid
+  isDemo       Boolean       @default(false) // generated by the demo seeder
+  createdAt    DateTime      @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation("PaymentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  receipt  Receipt?
+
+  @@index([tenantId])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId])
+}
+
+model Receipt {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  paymentId     String        @unique @db.Uuid
+  invoiceId     String        @db.Uuid
+  customerId    String        @db.Uuid
+  receiptNumber String
+  receiptDate   DateTime      @default(now())
+  amount        Decimal       @db.Decimal(14, 2)
+  paymentMethod PaymentMethod @default(BANK_TRANSFER)
+  reference     String?
+  description   String?
+  notes         String?
+  voidReason    String?
+  status        String        @default("ISSUED") // ISSUED | VOID
+  createdById   String?       @db.Uuid
+  isDemo        Boolean       @default(false) // generated by the demo seeder
+  createdAt     DateTime      @default(now())
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment   Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice   Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer  Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy User?     @relation("ReceiptCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  userId      String?  @db.Uuid
+  action      String
+  entity      String
+  entityId    String?
+  entityLabel String?
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entity])
+  @@index([tenantId, userId])
+}
+
+/// Per-user, server-persisted notifications (in-app bell + unread badge).
+/// tenantId is the related business when the notice is about one; null for
+/// platform-level notices. Optional fields keep arbitrary event payloads
+/// out of the schema — `link` is an in-app route, never user input.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tenantId  String?   @db.Uuid
+  type      String // TENANT_SUSPENDED | ACCESS_GRANTED | PAYMENT_RECEIVED | …
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
