@@ -2,7 +2,8 @@
 // Multi-tenant SaaS: shared database, logical tenant isolation via tenantId.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

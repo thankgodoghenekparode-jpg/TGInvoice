@@ -8,9 +8,7 @@
  * never touched. Deletion order respects foreign keys: receipts → payments →
  * invoices → quotations → products → customers.
  */
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../src/prisma.js';
 
 async function clearTenant(tenant) {
   const where = { isDemo: true, tenantId: tenant.id };

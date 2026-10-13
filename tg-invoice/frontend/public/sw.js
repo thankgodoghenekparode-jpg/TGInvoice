@@ -7,7 +7,7 @@
  *
  * Bump CACHE_VERSION to invalidate everything on the next deploy.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `tg-invoice-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `tg-invoice-assets-${CACHE_VERSION}`;
 
@@ -57,11 +57,20 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(SHELL_CACHE).then((cache) => cache.put('/index.html', copy)).catch(() => {});
+          const contentType = response.headers.get('content-type') || '';
+          if (response.ok && contentType.includes('text/html')) {
+            const copy = response.clone();
+            caches.open(SHELL_CACHE).then((cache) => cache.put('/index.html', copy)).catch(() => {});
+            return response;
+          }
+
+          if (response.status === 404) {
+            return caches.match('/index.html').then((cached) => cached || fetch('/index.html'));
+          }
+
           return response;
         })
-        .catch(() => caches.match('/index.html').then((cached) => cached || Response.error()))
+        .catch(() => caches.match('/index.html').then((cached) => cached || fetch('/index.html')))
     );
     return;
   }
@@ -75,7 +84,7 @@ self.addEventListener('fetch', (event) => {
           if (response && response.status === 200) cache.put(request, response.clone());
           return response;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
       return cached || network;
     })
   );

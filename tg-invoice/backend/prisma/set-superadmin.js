@@ -17,9 +17,8 @@
  * SECURITY: change the password immediately after first login in production.
  */
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../src/prisma.js';
 
-const prisma = new PrismaClient();
 const BCRYPT_ROUNDS = 12;
 const DEFAULT_PASSWORD = 'ChangeMe123!';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

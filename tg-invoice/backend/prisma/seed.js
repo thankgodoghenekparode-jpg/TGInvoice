@@ -9,12 +9,10 @@
  *   ABC Engineering Ltd   →  admin@abc-engineering.com / ChangeMe123!
  */
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../src/prisma.js';
 import { calculateDocumentTotals, deriveInvoiceStatus, computeBalance } from '../src/utils/money.js';
 import { allocateDocumentNumber } from '../src/services/sequenceService.js';
 import { logAudit } from '../src/services/auditService.js';
-
-const prisma = new PrismaClient();
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (n) => new Date(Date.now() - n * DAY);

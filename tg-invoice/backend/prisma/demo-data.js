@@ -13,11 +13,9 @@
  * It is safe to run repeatedly — by default it clears its own previous demo
  * records before writing fresh ones, so you never end up with duplicates.
  */
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../src/prisma.js';
 import { calculateDocumentTotals, deriveInvoiceStatus, computeBalance } from '../src/utils/money.js';
 import { allocateDocumentNumber } from '../src/services/sequenceService.js';
-
-const prisma = new PrismaClient();
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (n) => new Date(Date.now() - n * DAY);
