@@ -131,11 +131,11 @@ async function main() {
 
   /* Products & services */
   const productData = [
-    { name: 'Meter Installation', description: 'Supply and installation of single/three-phase energy meters.', category: 'METER_INSTALLATION', unit: 'job', unitPrice: 100000, taxRate: 7.5 },
-    { name: 'Meter Relocation', description: 'Safe disconnection and relocation of existing meters.', category: 'METER_RELOCATION', unit: 'job', unitPrice: 150000, taxRate: 7.5 },
-    { name: 'Energy Service', description: 'End-to-end energy audit and supply service.', category: 'ENERGY_SERVICE', unit: 'project', unitPrice: 250000, taxRate: 7.5 },
-    { name: 'Technical Service', description: 'On-site technical support and maintenance.', category: 'TECHNICAL_SERVICE', unit: 'day', unitPrice: 75000, taxRate: 7.5 },
-    { name: 'Consultation', description: 'Professional energy consultation session.', category: 'CONSULTATION', unit: 'session', unitPrice: 50000, taxRate: 0 },
+    { name: 'Installation', description: 'Professional installation service for your business needs.', category: 'Services', unit: 'job', unitPrice: 100000, taxRate: 7.5 },
+    { name: 'Relocation', description: 'Safe relocation of equipment or infrastructure.', category: 'Services', unit: 'job', unitPrice: 150000, taxRate: 7.5 },
+    { name: 'Project Service', description: 'End-to-end project delivery and management.', category: 'Services', unit: 'project', unitPrice: 250000, taxRate: 7.5 },
+    { name: 'Maintenance', description: 'On-site maintenance and support services.', category: 'Maintenance', unit: 'day', unitPrice: 75000, taxRate: 7.5 },
+    { name: 'Consulting', description: 'Professional business consultation session.', category: 'Consulting', unit: 'session', unitPrice: 50000, taxRate: 0 },
   ];
   const products = [];
   for (const p of productData) {
@@ -173,7 +173,7 @@ async function main() {
   /* Quotation QT-00002 (accepted) */
   const q2Items = calculateDocumentTotals([
     { productId: products[1].id, description: 'Meter Relocation', quantity: 1, unitPrice: 150000, discountType: null, discountValue: 0, taxRate: 7.5 },
-    { productId: products[4].id, description: 'Consultation — site assessment', quantity: 2, unitPrice: 50000, discountType: null, discountValue: 0, taxRate: 0 },
+    { productId: products[4].id, description: 'Consulting — site assessment', quantity: 2, unitPrice: 50000, discountType: null, discountValue: 0, taxRate: 0 },
   ]);
   const q2Number = await allocateDocumentNumber(prisma, zarox.id, 'QUOTATION', zs);
   const quotation2 = await prisma.quotation.create({

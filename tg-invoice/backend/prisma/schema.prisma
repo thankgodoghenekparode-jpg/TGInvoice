@@ -75,15 +75,7 @@ enum PaymentMethod {
   OTHER
 }
 
-enum ProductCategory {
-  METER_INSTALLATION
-  METER_RELOCATION
-  ENERGY_SERVICE
-  TECHNICAL_SERVICE
-  CONSULTATION
-  EQUIPMENT
-  OTHER
-}
+
 
 enum DocumentKind {
   CUSTOMER
@@ -280,7 +272,7 @@ model Product {
   tenantId    String          @db.Uuid
   name        String
   description String?
-  category    ProductCategory @default(OTHER)
+  category    String          @default("Other")
   unit        String          @default("unit")
   unitPrice   Decimal         @default(0) @db.Decimal(14, 2)
   taxRate     Decimal         @default(0) @db.Decimal(5, 2)

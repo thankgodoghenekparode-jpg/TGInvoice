@@ -28,13 +28,16 @@ export const statusMeta = (status, kind = 'invoice') =>
 export const pluralLabel = (kind) => (kind === 'quotation' ? 'Quotation' : 'Invoice');
 
 export const PRODUCT_CATEGORIES = [
-  { value: 'METER_INSTALLATION', label: 'Meter Installation' },
-  { value: 'METER_RELOCATION', label: 'Meter Relocation' },
-  { value: 'ENERGY_SERVICE', label: 'Energy Service' },
-  { value: 'TECHNICAL_SERVICE', label: 'Technical Service' },
-  { value: 'CONSULTATION', label: 'Consultation' },
-  { value: 'EQUIPMENT', label: 'Equipment' },
-  { value: 'OTHER', label: 'Other' },
+  { value: 'Products', label: 'Products' },
+  { value: 'Services', label: 'Services' },
+  { value: 'Labor', label: 'Labor' },
+  { value: 'Materials', label: 'Materials' },
+  { value: 'Equipment', label: 'Equipment' },
+  { value: 'Consulting', label: 'Consulting' },
+  { value: 'Maintenance', label: 'Maintenance' },
+  { value: 'Subscription', label: 'Subscription' },
+  { value: 'Rental', label: 'Rental' },
+  { value: 'Other', label: 'Other' },
 ];
 
 export const PAYMENT_METHODS = [

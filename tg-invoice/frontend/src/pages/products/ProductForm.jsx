@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, Field, LoadingBlock } from '../../components/ui.jsx';
 import { PRODUCT_CATEGORIES } from '../../utils/status.js';
 
-const EMPTY = { name: '', description: '', category: 'OTHER', unit: '', unitPrice: '', taxRate: '', active: true };
+const EMPTY = { name: '', description: '', category: 'Other', unit: '', unitPrice: '', taxRate: '', active: true };
 
 export default function ProductFormPage() {
   const { id } = useParams();
@@ -27,7 +27,7 @@ export default function ProductFormPage() {
         setForm({
           name: p.name || '',
           description: p.description || '',
-          category: p.category || 'OTHER',
+          category: p.category || 'Other',
           unit: p.unit || '',
           unitPrice: p.unitPrice ?? '',
           taxRate: p.taxRate ?? '',
@@ -91,14 +91,21 @@ export default function ProductFormPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name" required error={errors.name} className="sm:col-span-2">
-            <input className="input" value={form.name} onChange={set('name')} placeholder="Meter installation — 3 phase" required />
+            <input className="input" value={form.name} onChange={set('name')} placeholder="Website design, monthly support, office chair..." required />
           </Field>
-          <Field label="Category" error={errors.category}>
-            <select className="input" value={form.category} onChange={set('category')}>
+          <Field label="Category" error={errors.category} hint="e.g. Services, Products, Consulting, Maintenance">
+            <input
+              className="input"
+              list="product-categories"
+              value={form.category}
+              onChange={set('category')}
+              placeholder="Services"
+            />
+            <datalist id="product-categories">
               {PRODUCT_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <option key={c.value} value={c.value} />
               ))}
-            </select>
+            </datalist>
           </Field>
           <Field label="Unit" error={errors.unit} hint="e.g. hour, day, lump sum">
             <input className="input" value={form.unit} onChange={set('unit')} placeholder="service" />

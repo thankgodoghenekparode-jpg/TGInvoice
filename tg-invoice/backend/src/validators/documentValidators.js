@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+
+
 export const customerSchema = z.object({
   name: z.string().trim().min(1, 'Customer name is required.').max(160),
   companyName: z.string().trim().max(160).optional().or(z.literal('')),
@@ -16,9 +18,7 @@ export const customerSchema = z.object({
 export const productSchema = z.object({
   name: z.string().trim().min(1, 'Name is required.').max(160),
   description: z.string().trim().max(1000).optional().or(z.literal('')),
-  category: z
-    .enum(['METER_INSTALLATION', 'METER_RELOCATION', 'ENERGY_SERVICE', 'TECHNICAL_SERVICE', 'CONSULTATION', 'EQUIPMENT', 'OTHER'])
-    .catch('OTHER'),
+  category: z.string().trim().max(60).optional().or(z.literal('')).transform((v) => (v && v.length > 0 ? v : 'Other')),
   unit: z.string().trim().max(40).optional().or(z.literal('')),
   unitPrice: z.coerce.number().min(0, 'Price cannot be negative.').max(99_999_999_999),
   taxRate: z.coerce.number().min(0, 'Tax cannot be negative.').max(100),
