@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import clsx from 'clsx';
 import api from '../services/api.js';
 import { useSettings } from '../hooks/useSettings.js';
 import { formatMoney } from '../utils/currency.js';
@@ -20,7 +21,7 @@ const blankRow = (defaults = {}) => ({
  * Line-items editor with a live totals preview.
  * Server re-computes everything on save — this is UX only.
  */
-export default function LineItems({ items, onChange, defaultTaxRate = 0 }) {
+export default function LineItems({ items, onChange, defaultTaxRate = 0, showErrors = false }) {
   const { settings } = useSettings();
   const [products, setProducts] = useState([]);
 
@@ -71,14 +72,21 @@ export default function LineItems({ items, onChange, defaultTaxRate = 0 }) {
       <div className="space-y-2">
         {items.map((row, i) => {
           const line = calcLine(row);
+          const missingDesc = showErrors && !row.description.trim();
+          const missingQty = showErrors && !(Number(row.quantity) > 0);
+          const missingPrice = showErrors && (row.unitPrice === '' || Number.isNaN(Number(row.unitPrice)));
+          const rowFlagged = missingDesc || missingQty || missingPrice;
           return (
             <div
               key={i}
-              className="rounded-lg border border-slate-200 bg-white p-3 md:grid md:grid-cols-[minmax(0,1fr)_80px_120px_100px_80px_120px_36px] md:items-start md:gap-2"
+              className={clsx(
+                'rounded-lg border bg-white p-3 md:grid md:grid-cols-[minmax(0,1fr)_80px_120px_100px_80px_120px_36px] md:items-start md:gap-2',
+                rowFlagged ? 'border-rose-300' : 'border-slate-200'
+              )}
             >
               <div className="mb-2 space-y-1.5 md:mb-0">
                 <input
-                  className="input"
+                  className={clsx('input', missingDesc && 'border-rose-400')}
                   placeholder="Type a new item or service…"
                   value={row.description}
                   onChange={(e) => update(i, { description: e.target.value })}
@@ -103,7 +111,7 @@ export default function LineItems({ items, onChange, defaultTaxRate = 0 }) {
                   type="number"
                   min="0.01"
                   step="0.01"
-                  className="input text-right"
+                  className={clsx('input text-right', missingQty && 'border-rose-400')}
                   value={row.quantity}
                   onChange={(e) => update(i, { quantity: e.target.value })}
                 />
@@ -115,7 +123,7 @@ export default function LineItems({ items, onChange, defaultTaxRate = 0 }) {
                   type="number"
                   min="0"
                   step="0.01"
-                  className="input text-right"
+                  className={clsx('input text-right', missingPrice && 'border-rose-400')}
                   value={row.unitPrice}
                   onChange={(e) => update(i, { unitPrice: e.target.value })}
                 />

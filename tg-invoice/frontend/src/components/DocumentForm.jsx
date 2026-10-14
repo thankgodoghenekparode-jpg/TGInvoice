@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save, UserPlus } from 'lucide-react';
 import api, { apiMessage, apiFieldErrors } from '../services/api.js';
@@ -54,6 +54,7 @@ export default function DocumentForm({ kind }) {
   const [loading, setLoading] = useState(editing);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showValidation, setShowValidation] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState('');
 
@@ -109,6 +110,7 @@ export default function DocumentForm({ kind }) {
       const { data } = await api.post('/customers', { name: quickName.trim() });
       setCustomers((list) => [...list, data.data].sort((a, b) => a.name.localeCompare(b.name)));
       setForm((f) => ({ ...f, customerId: data.data.id }));
+      setErrors((prev) => (prev.customerId ? { ...prev, customerId: undefined } : prev));
       setQuickOpen(false);
       setQuickName('');
       toast.success(`Customer ${data.data.name} added.`);
@@ -117,15 +119,48 @@ export default function DocumentForm({ kind }) {
     }
   };
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) => {
+    const { value } = e.target;
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
 
-  const valid = useMemo(() => {
-    if (!form.customerId) return false;
-    return items.every((it) => it.description.trim() && Number(it.quantity) > 0 && it.unitPrice !== '');
-  }, [form.customerId, items]);
+  const updateItems = (next) => {
+    setItems(next);
+    setErrors((prev) => (prev.items ? { ...prev, items: undefined } : prev));
+  };
+
+  /**
+   * What's still missing, in plain language. We validate on click rather than
+   * disabling the button, so the user is always told *why* they can't save.
+   */
+  const validate = () => {
+    const problems = [];
+    if (!form.customerId) problems.push('select a customer');
+    items.forEach((it, i) => {
+      const line = `line ${i + 1}`;
+      if (!it.description.trim()) problems.push(`${line} needs a description`);
+      if (!(Number(it.quantity) > 0)) problems.push(`${line} needs a quantity above 0`);
+      if (it.unitPrice === '' || Number.isNaN(Number(it.unitPrice))) problems.push(`${line} needs a unit price`);
+    });
+    return problems;
+  };
 
   const submit = async (e) => {
     e.preventDefault();
+    if (busy) return;
+
+    const problems = validate();
+    if (problems.length) {
+      setShowValidation(true);
+      setErrors({
+        customerId: form.customerId ? undefined : 'Select a customer.',
+        items: `Please fix: ${problems.join(', ')}.`,
+      });
+      toast.error(`Can’t save yet — ${problems.join(', ')}.`);
+      return;
+    }
+
     setBusy(true);
     setErrors({});
     const payload = {
@@ -184,7 +219,7 @@ export default function DocumentForm({ kind }) {
         }
       />
 
-      <form onSubmit={submit} className="space-y-6">
+      <form onSubmit={submit} noValidate className="space-y-6">
         {/* Meta */}
         <div className="card grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-xl border border-brand-100 bg-gradient-to-r from-brand-50/80 to-white px-4 py-3 sm:col-span-2 lg:col-span-3">
@@ -246,7 +281,7 @@ export default function DocumentForm({ kind }) {
           <div className="mb-4 rounded-xl border border-brand-100 bg-gradient-to-r from-brand-50/80 to-white px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900">Line items</h2>
           </div>
-          <LineItems items={items} onChange={setItems} defaultTaxRate={settings.defaultTaxRate || 0} />
+          <LineItems items={items} onChange={updateItems} defaultTaxRate={settings.defaultTaxRate || 0} showErrors={showValidation} />
           {errors.items && <p className="mt-2 text-xs text-rose-600">{errors.items}</p>}
 
           <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
@@ -272,7 +307,7 @@ export default function DocumentForm({ kind }) {
             <Link to={editing ? `${base}/${id}` : base} className="btn btn-secondary btn-sm">
               Cancel
             </Link>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !valid}>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
               <Save size={15} /> {busy ? 'Saving…' : editing ? `Save ${singular}` : `Create ${singular}`}
             </button>
           </div>
