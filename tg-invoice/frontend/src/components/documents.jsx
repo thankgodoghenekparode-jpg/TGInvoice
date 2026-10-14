@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Download, Printer, MessageCircle, Mail, X, Plus, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { Download, Printer, Share2, Mail, X, Plus, AlertTriangle, ArrowRightLeft } from 'lucide-react';
 import { api, apiMessage, apiFieldErrors } from '../services/api.js';
 import { downloadPdf, printPdf } from '../services/files.js';
+import { shareDocument, pdfFileName } from '../services/share.js';
 import { formatMoney, amountInWords } from '../utils/currency.js';
 import { formatDate } from '../utils/dates.js';
 import { PAYMENT_METHODS, paymentMethodLabel } from '../utils/status.js';
@@ -341,19 +342,19 @@ export function DocumentPaper({ kind, doc, settings = {} }) {
   );
 }
 
-/* ── Action bar: Download / Print / WhatsApp / Email / Close ──────── */
+/* ── Action bar: Download / Print / Share / Email / Close ─────────── */
 
 export function DocumentActions({ kind, id, reference, customer, subjectPrefix, onClose }) {
   const [emailOpen, setEmailOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const { activeTenant } = useAuth();
   const { settings } = useSettings();
   const toast = useToast();
   const [share, setShare] = useState(null);
   const base = KIND_PLURAL[kind];
 
-  // Pre-fetch the click-to-chat link so the WhatsApp button can act
-  // synchronously when clicked. Opening a window after an `await` is treated
-  // as a non-user gesture by mobile browsers and gets blocked.
+  // Pre-fetch the message + public link so the fallback path can act
+  // synchronously when that is all the browser supports.
   useEffect(() => {
     if (!activeTenant?.id) return undefined;
     let alive = true;
@@ -380,24 +381,42 @@ export function DocumentActions({ kind, id, reference, customer, subjectPrefix, 
     }
   };
 
-  const handleWhatsapp = async () => {
-    let payload = share;
-    if (!payload) {
-      try {
-        const { data } = await api.get(`${base}/${id}/share`, { headers: { 'X-Tenant-Id': activeTenant.id } });
-        payload = data.data;
-        setShare(payload);
-      } catch (err) {
-        toast.error(apiMessage(err, 'Could not build the WhatsApp link.'));
-        return;
+  /**
+   * Share the document itself. The Web Share API hands the PDF to the OS share
+   * sheet (WhatsApp, Mail, Drive…) where supported; elsewhere it opens WhatsApp
+   * with the message + link and saves the PDF for manual attachment.
+   */
+  const handleShare = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      let payload = share;
+      if (!payload) {
+        try {
+          const { data } = await api.get(`${base}/${id}/share`, { headers: { 'X-Tenant-Id': activeTenant.id } });
+          payload = data.data;
+          setShare(payload);
+        } catch {
+          payload = null; // sharing the PDF can still succeed without the link
+        }
       }
-    }
-    const isMobile = /Android|iPhone|iPad|iPod|Windows Phone|BlackBerry|webOS/i.test(navigator.userAgent || '');
-    if (isMobile && payload.phone) {
-      // Open the WhatsApp app actually installed on this phone.
-      window.location.href = `whatsapp://send?phone=${payload.phone}&text=${encodeURIComponent(payload.text || '')}`;
-    } else {
-      window.open(payload.url, '_blank', 'noopener,noreferrer');
+
+      const result = await shareDocument({
+        pdfPath: `${base}/${id}/pdf`,
+        fileName: pdfFileName(reference),
+        title: `${subjectPrefix || kind} ${reference}`,
+        text: payload?.text || `Please find ${(subjectPrefix || kind).toLowerCase()} ${reference} attached.`,
+        previewUrl: payload?.previewUrl,
+        whatsappUrl: payload?.url,
+      });
+
+      if (result === 'whatsapp') {
+        toast.info('The PDF was saved — attach it in WhatsApp to send the file itself.', 'Share');
+      }
+    } catch (err) {
+      toast.error(apiMessage(err, 'Could not share the document.'));
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -409,8 +428,14 @@ export function DocumentActions({ kind, id, reference, customer, subjectPrefix, 
       <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrint}>
         <Printer size={15} /> Print
       </button>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={handleWhatsapp} title="Share on WhatsApp">
-        <MessageCircle size={15} /> WhatsApp
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm"
+        onClick={handleShare}
+        disabled={sharing}
+        title="Share the PDF — pick WhatsApp, email or any app"
+      >
+        <Share2 size={15} /> {sharing ? 'Sharing…' : 'Share'}
       </button>
       <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEmailOpen(true)}>
         <Mail size={15} /> Email
