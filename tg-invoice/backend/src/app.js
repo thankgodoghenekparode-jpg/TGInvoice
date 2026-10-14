@@ -2,7 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'node:path';
 import config from './config.js';
-import { securityHeaders, corsOptions, apiLimiter } from './middleware/security.js';
+import { securityHeaders, corsOptions, apiLimiter, tenantLimiter } from './middleware/security.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requireAuth, requireTenant } from './middleware/auth.js';
 
@@ -19,6 +19,7 @@ import {
   teamRouter,
   auditRouter,
   searchRouter,
+  flagRouter,
 } from './routes/core.routes.js';
 import {
   quotationRouter,
@@ -53,6 +54,8 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRouter);
+// Feature flags gate the login page too, so they are public (rollout only).
+app.use('/api/flags', flagRouter);
 // Notifications: per-user, tenant-free (platform operators have no business).
 app.use('/api/notifications', notificationRoutes);
 // Invitation token endpoints are public: the token itself is the credential.
@@ -64,7 +67,7 @@ app.use('/api/public', publicRoutes);
 /* Every one of these runs: JWT → membership check → tenant context.
    Controllers then query exclusively with req.tenant.id.               */
 
-const scoped = [requireAuth, requireTenant];
+const scoped = [requireAuth, requireTenant, tenantLimiter];
 
 app.use('/api/settings', ...scoped, settingsRouter);
 app.use('/api/customers', ...scoped, customerRouter);

@@ -82,6 +82,7 @@ enum DocumentKind {
   QUOTATION
   INVOICE
   RECEIPT
+  CREDIT_NOTE
 }
 
 // ─────────────────────────────────────────────
@@ -112,6 +113,9 @@ model User {
   createdReceipts   Receipt[]        @relation("ReceiptCreator")
   auditLogs        AuditLog[]
   notifications    Notification[]
+  createdRecurringInvoices RecurringInvoice[] @relation("RecurringInvoiceCreator")
+  uploadedAttachments      Attachment[]       @relation("AttachmentUploader")
+  createdCreditNotes       CreditNote[]       @relation("CreditNoteCreator")
 
   @@index([email])
 }
@@ -143,6 +147,17 @@ model Tenant {
   passwordResets    PasswordResetToken[]
   emailVerifs       EmailVerificationToken[]
   notifications     Notification[]
+
+  recurringInvoices RecurringInvoice[]
+  reminderRules     ReminderRule[]
+  messageLogs       MessageLog[]
+  attachments       Attachment[]
+  customFields      CustomField[]
+  customFieldValues CustomFieldValue[]
+  documentTemplates DocumentTemplate[]
+  creditNotes       CreditNote[]
+  referralsReceived Referral[]
+  paymentIntents    PaymentIntent[]
 }
 
 model Membership {
@@ -261,6 +276,8 @@ model Customer {
   invoices   Invoice[]
   payments   Payment[]
   receipts   Receipt[]
+  recurringInvoices RecurringInvoice[]
+  creditNotes CreditNote[]
 
   @@unique([tenantId, customerCode])
   @@index([tenantId])
@@ -427,6 +444,7 @@ model Invoice {
   items       InvoiceItem[]
   payments    Payment[]
   receipts    Receipt[]
+  paymentIntents PaymentIntent[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId])
@@ -553,4 +571,434 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+// ─────────────────────────────────────────────
+// Infrastructure: background jobs & feature flags
+// ─────────────────────────────────────────────
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Durable work queue. The API enqueues; `npm run worker` drains it. Claims use
+/// `FOR UPDATE SKIP LOCKED`, so any number of workers can run safely.
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  payload     Json      @default("{}")
+  status      JobStatus @default(PENDING)
+  runAt       DateTime  @default(now())
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  priority    Int       @default(0)
+  dedupeKey   String?   @unique // idempotency: at most one live job per key
+  lockedAt    DateTime?
+  lockedBy    String?
+  lastError   String?
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt])
+  @@index([type, status])
+  @@index([status, lockedAt])
+}
+
+/// Simple feature flags + percentage/allowlist rollout, read by `/api/flags`.
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  rollout     Int      @default(100) // 0–100, deterministic by tenant id
+  tenantIds   Json? // explicit allowlist (array of tenant ids), if set
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// Recurring invoices & dunning
+// ─────────────────────────────────────────────
+
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+model RecurringInvoice {
+  id           String              @id @default(uuid()) @db.Uuid
+  tenantId     String              @db.Uuid
+  customerId   String              @db.Uuid
+  name         String
+  frequency    RecurrenceFrequency @default(MONTHLY)
+  interval     Int                 @default(1) // every N frequency units
+  nextRunAt    DateTime
+  lastRunAt    DateTime?
+  endDate      DateTime?
+  dueInDays    Int                 @default(14)
+  autoSend     Boolean             @default(true) // email/WhatsApp each generated invoice
+  autoCharge   Boolean             @default(false) // charge a saved gateway reference
+  status       RecurringStatus     @default(ACTIVE)
+  reference    String?
+  notes        String?
+  terms        String?
+  generatedCount Int               @default(0)
+  createdById  String?             @db.Uuid
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy User?                @relation("RecurringInvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items    RecurringInvoiceItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([status, nextRunAt])
+}
+
+model RecurringInvoiceItem {
+  id                 String       @id @default(uuid()) @db.Uuid
+  recurringInvoiceId String       @db.Uuid
+  productId          String?      @db.Uuid
+  description        String
+  quantity           Decimal      @db.Decimal(12, 2)
+  unitPrice          Decimal      @db.Decimal(14, 2)
+  discountType       DiscountType?
+  discountValue      Decimal      @default(0) @db.Decimal(14, 2)
+  taxRate            Decimal      @default(0) @db.Decimal(5, 2)
+  position           Int          @default(0)
+
+  recurringInvoice RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([recurringInvoiceId])
+}
+
+enum ReminderStage {
+  BEFORE_DUE
+  ON_DUE
+  AFTER_DUE
+}
+
+enum MessageChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+}
+
+/// A dunning rule: when + how to chase an unpaid invoice.
+/// `offsetDays` is signed relative to the due date (−3 = three days before due).
+model ReminderRule {
+  id           String           @id @default(uuid()) @db.Uuid
+  tenantId     String           @db.Uuid
+  name         String
+  enabled      Boolean          @default(true)
+  stage        ReminderStage    @default(AFTER_DUE)
+  offsetDays   Int              @default(0)
+  channels     MessageChannel[] @default([EMAIL])
+  subject      String?
+  bodyTemplate String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, enabled])
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// Delivery log for WhatsApp / SMS / email sends (audit + debugging + resend).
+model MessageLog {
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @db.Uuid
+  channel           MessageChannel
+  to                String
+  subject           String?
+  body              String?
+  status            MessageStatus  @default(QUEUED)
+  provider          String?
+  providerMessageId String?
+  error             String?
+  documentKind      DocumentKind?
+  documentId        String?        @db.Uuid
+  customerId        String?        @db.Uuid
+  createdAt         DateTime       @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, channel])
+  @@index([documentKind, documentId])
+}
+
+// ─────────────────────────────────────────────
+// Attachments, custom fields & document templates
+// ─────────────────────────────────────────────
+
+/// A file attached to any document (contract on a quotation, PO scan, etc.).
+/// documentId is polymorphic (CUSTOMER/QUOTATION/INVOICE/RECEIPT/CREDIT_NOTE),
+/// so it is a plain indexed column — integrity is enforced in the controller.
+model Attachment {
+  id           String       @id @default(uuid()) @db.Uuid
+  tenantId     String       @db.Uuid
+  documentKind DocumentKind
+  documentId   String       @db.Uuid
+  fileName     String
+  mimeType     String
+  size         Int
+  key          String // storage key (never a filesystem path)
+  uploadedById String?      @db.Uuid
+  createdAt    DateTime     @default(now())
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation("AttachmentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, documentKind, documentId])
+  @@index([tenantId, createdAt])
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  BOOLEAN
+}
+
+/// A tenant-defined extra field on customers/documents.
+model CustomField {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @db.Uuid
+  entity          DocumentKind
+  key             String
+  label           String
+  type            CustomFieldType @default(TEXT)
+  options         Json? // for SELECT
+  required        Boolean         @default(false)
+  showOnDocument  Boolean         @default(false) // print on the PDF
+  position        Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  values CustomFieldValue[]
+
+  @@unique([tenantId, entity, key])
+  @@index([tenantId, entity])
+}
+
+model CustomFieldValue {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @db.Uuid
+  fieldId   String       @db.Uuid
+  entity    DocumentKind
+  entityId  String       @db.Uuid
+  value     String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  field  CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, entityId])
+  @@index([tenantId, entity, entityId])
+}
+
+/// A visual template for generated PDFs. One default per (tenant, kind).
+model DocumentTemplate {
+  id              String       @id @default(uuid()) @db.Uuid
+  tenantId        String       @db.Uuid
+  name            String
+  kind            DocumentKind
+  isDefault       Boolean      @default(false)
+  accentColor     String? // hex, e.g. #2563eb
+  showLogo        Boolean      @default(true)
+  showBankDetails Boolean      @default(true)
+  headerNote      String?
+  footerNote      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, kind])
+}
+
+// ─────────────────────────────────────────────
+// Credit notes / refunds
+// ─────────────────────────────────────────────
+
+enum CreditNoteStatus {
+  DRAFT
+  ISSUED
+  APPLIED
+  VOID
+}
+
+model CreditNote {
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @db.Uuid
+  customerId       String           @db.Uuid
+  invoiceId        String?          @db.Uuid
+  creditNoteNumber String
+  creditNoteDate   DateTime         @default(now())
+  status           CreditNoteStatus @default(DRAFT)
+  subtotal         Decimal          @default(0) @db.Decimal(14, 2)
+  discountAmount   Decimal          @default(0) @db.Decimal(14, 2)
+  taxAmount        Decimal          @default(0) @db.Decimal(14, 2)
+  total            Decimal          @default(0) @db.Decimal(14, 2)
+  amountApplied    Decimal          @default(0) @db.Decimal(14, 2)
+  reason           String?
+  notes            String?
+  createdById      String?          @db.Uuid
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer  Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy User?           @relation("CreditNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items     CreditNoteItem[]
+
+  @@unique([tenantId, creditNoteNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, createdAt])
+}
+
+model CreditNoteItem {
+  id           String       @id @default(uuid()) @db.Uuid
+  creditNoteId String       @db.Uuid
+  productId    String?      @db.Uuid
+  description  String
+  quantity     Decimal      @db.Decimal(12, 2)
+  unitPrice    Decimal      @db.Decimal(14, 2)
+  discountType DiscountType?
+  discountValue Decimal     @default(0) @db.Decimal(14, 2)
+  taxRate      Decimal      @default(0) @db.Decimal(5, 2)
+  amount       Decimal      @default(0) @db.Decimal(14, 2)
+  position     Int          @default(0)
+
+  creditNote CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+
+  @@index([creditNoteId])
+}
+
+// ─────────────────────────────────────────────
+// Growth: referrals, partners, online payments
+// ─────────────────────────────────────────────
+
+enum ReferralStatus {
+  PENDING
+  ACTIVE
+  REWARDED
+  EXPIRED
+}
+
+/// A shareable code owned by the platform, a business or a user.
+model ReferralCode {
+  id          String       @id @default(uuid()) @db.Uuid
+  code        String       @unique
+  ownerType   String       @default("TENANT") // PLATFORM | TENANT | USER | PARTNER
+  ownerId     String?      @db.Uuid
+  rewardType  String       @default("PERCENT") // PERCENT | FIXED
+  rewardValue Decimal      @default(0) @db.Decimal(10, 2)
+  active      Boolean      @default(true)
+  uses        Int          @default(0)
+  maxUses     Int?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  referrals Referral[]
+}
+
+model Referral {
+  id               String         @id @default(uuid()) @db.Uuid
+  codeId           String         @db.Uuid
+  referrerTenantId String?        @db.Uuid
+  referredTenantId String         @db.Uuid
+  referredUserId   String?        @db.Uuid
+  status           ReferralStatus @default(PENDING)
+  rewardAmount     Decimal        @default(0) @db.Decimal(14, 2)
+  rewardedAt       DateTime?
+  createdAt        DateTime       @default(now())
+
+  code           ReferralCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  referredTenant Tenant       @relation(fields: [referredTenantId], references: [id], onDelete: Cascade)
+
+  @@index([codeId])
+  @@index([referredTenantId])
+  @@index([referrerTenantId])
+}
+
+/// Reseller / accountant / affiliate program member.
+model Partner {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  type           String   @default("AFFILIATE") // RESELLER | ACCOUNTANT | AFFILIATE
+  email          String?
+  phone          String?
+  companyName    String?
+  commissionRate Decimal  @default(0) @db.Decimal(5, 2)
+  status         String   @default("ACTIVE") // ACTIVE | SUSPENDED
+  userId         String?  @db.Uuid
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([type, status])
+}
+
+enum PaymentIntentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  ABANDONED
+}
+
+/// A hosted-checkout attempt against an invoice. The gateway webhook flips
+/// this to SUCCEEDED and records the matching Payment + Receipt.
+model PaymentIntent {
+  id           String              @id @default(uuid()) @db.Uuid
+  tenantId     String              @db.Uuid
+  invoiceId    String              @db.Uuid
+  customerId   String              @db.Uuid
+  provider     String              @default("PAYSTACK") // PAYSTACK | FLUTTERWAVE
+  reference    String              @unique // our idempotency reference
+  providerRef  String?
+  amount       Decimal             @db.Decimal(14, 2)
+  currency     String              @default("NGN")
+  status       PaymentIntentStatus @default(PENDING)
+  checkoutUrl  String?
+  metadata     Json?
+  paidAt       DateTime?
+  createdById  String?             @db.Uuid
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([invoiceId])
+  @@index([status])
 }

@@ -7,6 +7,7 @@ import * as products from '../controllers/productController.js';
 import * as team from '../controllers/teamController.js';
 import * as audit from '../controllers/auditController.js';
 import * as search from '../controllers/searchController.js';
+import * as flags from '../controllers/featureFlagController.js';
 import { validate } from '../middleware/errorHandler.js';
 import { customerSchema, productSchema } from '../validators/documentValidators.js';
 
@@ -72,3 +73,8 @@ auditRouter.get('/', requireAdmin, audit.listAuditLogs);
 
 export const searchRouter = Router();
 searchRouter.get('/', search.globalSearch);
+
+/* ── Feature flags (public: login & marketing gate on them too) ──── */
+
+export const flagRouter = Router();
+flagRouter.get('/', flags.list);

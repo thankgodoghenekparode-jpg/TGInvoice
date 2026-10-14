@@ -4,7 +4,11 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
+import { initAnalytics } from './services/analytics.js';
 import './index.css';
+
+// Product analytics: no-op unless VITE_POSTHOG_KEY is configured.
+initAnalytics();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

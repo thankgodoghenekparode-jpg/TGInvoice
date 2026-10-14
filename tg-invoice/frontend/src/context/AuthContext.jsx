@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import api, { setAccessToken, setStoredTenantId, getStoredTenantId, refreshSession as requestSessionRefresh } from '../services/api';
+import { identify, setAnalyticsGroup, resetAnalytics } from '../services/analytics';
+import { refreshFlags } from '../hooks/useFlags';
 
 /**
  * Auth + active-business context.
@@ -30,6 +32,9 @@ export function AuthProvider({ children }) {
     setActiveTenant(chosen);
     if (chosen) setStoredTenantId(chosen.id);
     else setStoredTenantId(null);
+    // Analytics: bind events to the signed-in user and their active business.
+    identify({ id: data.user?.id, email: data.user?.email, name: data.user?.name });
+    if (chosen) setAnalyticsGroup(chosen.id);
     return chosen;
   }, []);
 
@@ -39,6 +44,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setTenants([]);
     setActiveTenant(null);
+    resetAnalytics(); // never leak one user's traits into the next session
   }, []);
 
   useEffect(() => {
@@ -88,6 +94,9 @@ export function AuthProvider({ children }) {
       const tenant = data.data.tenant;
       setActiveTenant((prev) => ({ ...(prev || {}), ...tenant }));
       setTenants((list) => list.map((t) => (t.id === tenantId ? { ...t, ...tenant, role: data.data.role } : t)));
+      // Rollout is evaluated per business server-side, so re-read flags.
+      setAnalyticsGroup(tenantId);
+      refreshFlags().catch(() => {});
       return data.data;
     },
     []

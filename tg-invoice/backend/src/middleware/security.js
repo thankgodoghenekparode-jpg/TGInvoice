@@ -43,3 +43,23 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, error: { code: 'TOO_MANY_REQUESTS', message: 'Too many requests. Please slow down.' } },
 });
+
+/**
+ * Per-TENANT limiter (mounted after requireTenant).
+ *
+ * The IP limit alone is not enough: one noisy business behind a shared office
+ * NAT could exhaust the shared IP bucket and starve unrelated tenants. Keying
+ * on tenant id budgets each business independently; unauthenticated traffic
+ * falls back to the user id, then the IP.
+ */
+export const tenantLimiter = rateLimit({
+  windowMs: config.rateLimit.tenantWindowMs,
+  limit: config.rateLimit.perTenant,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => req.tenant?.id || req.user?.id || req.ip,
+  message: {
+    success: false,
+    error: { code: 'TOO_MANY_REQUESTS', message: 'Too many requests for this business. Please slow down.' },
+  },
+});

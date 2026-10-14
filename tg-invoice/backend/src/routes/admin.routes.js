@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth, requirePlatformAdmin } from '../middleware/auth.js';
 import { validate } from '../middleware/errorHandler.js';
 import * as admin from '../controllers/adminController.js';
+import * as flags from '../controllers/featureFlagController.js';
 import {
   createTenantSchema,
   updateTenantSchema,
@@ -46,5 +47,10 @@ router.post('/users', validate(createPlatformUserSchema), admin.addPlatformUser)
 router.post('/users/:id/suspend', admin.suspendUser);
 router.post('/users/:id/activate', admin.activateUser);
 router.patch('/users/:id/platform-admin', validate(setPlatformAdminSchema), admin.setPlatformAdmin);
+
+/* Feature flags (gradual rollout / kill switches) */
+router.get('/flags', flags.adminList);
+router.put('/flags', flags.adminUpsert);
+router.delete('/flags/:id', flags.adminRemove);
 
 export default router;

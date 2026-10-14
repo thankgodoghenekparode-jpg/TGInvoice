@@ -1,0 +1,35 @@
+name: Database migrations
+
+# Manual/triggered escape hatch for applying migrations to production without
+# waiting on Render's build step. Requires the repository secrets
+# `PRODUCTION_DATABASE_URL` (use Neon's POOLED connection string).
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "apply" to run migrations against production
+        required: true
+        default: ""
+
+jobs:
+  migrate:
+    if: github.event.inputs.confirm == 'apply'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tg-invoice/backend
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tg-invoice/backend/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Apply migrations (non-interactive)
+        run: npx prisma migrate deploy

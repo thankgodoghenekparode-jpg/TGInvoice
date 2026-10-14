@@ -183,6 +183,7 @@ Open <http://localhost:5173> and sign in with a demo account (section 6).
 |---------|--------------|
 | `npm run dev` | Start the API with file watching |
 | `npm start` | Start the API once (production style) |
+| `npm run worker` | Start the background worker (recurring invoices, dunning reminders, async sends). Run as a separate process/service in production. |
 | `npm test` | Run the tenant-isolation + platform-admin test suite |
 | `npm run prisma:migrate` | Create/apply a migration in development (`prisma migrate dev`) |
 | `npm run prisma:deploy` | Apply pending migrations (`prisma migrate deploy`) |
@@ -232,6 +233,17 @@ Open <http://localhost:5173> and sign in with a demo account (section 6).
 | `PUBLIC_BASE_URL` | ✅ in prod | Absolute, client-reachable base URL of the API, **without** a trailing slash or `/api` (e.g. `https://tg-invoice-api.onrender.com`). Used to build the public "view online" document links shared over WhatsApp/email. Defaults to `http://localhost:<PORT>` locally. |
 | `SHARE_SECRET` | – | Secret used to HMAC-sign public share tokens. Falls back to `JWT_SECRET` when unset; set a distinct value in production. |
 | `SHARE_LINK_DAYS` | – | How long a shared document link stays valid, in days (default `30`). |
+| `INLINE_WORKER` | – | `true` drains the job queue **inside** the API process (dev / single free instance). Default `false` — run `npm run worker` as its own service in production. |
+| `JOBS_POLL_MS` / `JOBS_BATCH_SIZE` / `JOBS_MAX_ATTEMPTS` | – | Worker tuning (defaults `5000`, `10`, `5`). |
+| `CACHE_DRIVER` | – | `memory` (default) or `redis`. `redis` uses `REDIS_URL` and needs the optional `ioredis` package; it falls back to memory if unavailable. |
+| `REDIS_URL` | – | Redis connection string, used for the shared cache and ready for per-tenant rate-limit storage. |
+| `CACHE_TTL_SECONDS` | – | Default cache TTL for settings/report reads (default `30`). |
+| `RATE_LIMIT_PER_TENANT` / `RATE_LIMIT_TENANT_WINDOW_MS` | – | Per-business request budget (default `600` per `60000` ms) so one noisy tenant cannot starve others. |
+| `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_API_VERSION` / `WHATSAPP_BUSINESS_NUMBER` | – | WhatsApp Cloud API credentials for automatic document/reminder delivery. **Unset = WhatsApp sending disabled** (shares fall back to the `wa.me` link, as today). |
+| `SMS_PROVIDER` (`termii` \| `africas_talking` \| `twilio`) / `SMS_API_KEY` / `SMS_SENDER_ID` / `SMS_FROM` / `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | – | SMS delivery. **Unset = SMS disabled.** |
+| `PAYMENT_PROVIDER` (`paystack` \| `flutterwave`) / `PAYMENT_PUBLIC_KEY` / `PAYMENT_SECRET_KEY` / `PAYMENT_WEBHOOK_SECRET` / `PAYMENT_CALLBACK_URL` | – | Online payment links + webhook reconciliation. **Unset = payment links disabled.** |
+| `POSTHOG_KEY` / `POSTHOG_HOST` | – | Backend-side analytics. The frontend reads `VITE_POSTHOG_*` instead. |
+| `APP_URL` | – | Public web-app URL used for referral links (defaults to `FRONTEND_URL`). |
 
 `config.js` **fails fast** at boot if `JWT_SECRET` or `JWT_REFRESH_SECRET` is missing (except under tests).
 
@@ -240,6 +252,7 @@ Open <http://localhost:5173> and sign in with a demo account (section 6).
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `VITE_API_URL` | ✅ | Base URL of the API including `/api`, e.g. `http://localhost:5050/api` or `https://tg-invoice-api.onrender.com/api`. |
+| `VITE_POSTHOG_KEY` | – | PostHog project key. **Unset = analytics fully disabled** (nothing is loaded). Set with `VITE_POSTHOG_HOST` (default `https://us.i.posthog.com`). |
 
 ---
 
@@ -416,12 +429,22 @@ The app deploys as three pieces: **Neon** (database) → **Render** (API) → **
    ```
    (Add `npm run db:seed` if you want the demo businesses in the cloud too — skip for a clean production database.)
 
+**Scaling notes (do these before traffic grows):**
+
+- **Always use the pooled string.** Neon's pooler (PgBouncer, transaction mode) is what keeps you under Postgres' `max_connections` when you run several API instances plus a worker. The direct (unpooled) string is only for migrations and admin tooling.
+- **One pool per process.** The API keeps a single `pg.Pool` (`src/prisma.js`). With `N` Render instances and one worker you hold roughly `N × poolMax + 1` connections — keep that below the Neon plan's limit. If you raise instances, lower the pool size or add `?connection_limit=` / `?pool_timeout=` to `DATABASE_URL`.
+- **Read replicas.** Neon can attach read replicas. Point heavy read-only paths (reports, exports) at a replica `DATABASE_URL` if/when report load starts competing with writes; keep all writes on the primary.
+- **PgBouncer caveats.** In transaction pooling mode, avoid session-level features (advisory locks held across statements, `LISTEN/NOTIFY`). The job queue is designed around this: it leases work with `FOR UPDATE SKIP LOCKED` inside a single statement rather than holding a session lock.
+
 ### 11.2 API — Render
 
 1. New **Web Service** → connect the repository → **Root Directory:** `backend`.
 2. Build command: `npm install && npx prisma generate && npx prisma migrate deploy`
 3. Start command: `npm start`
-4. Environment variables:
+4. New **Background Worker** (same repo / root `backend`) so recurring invoices and dunning reminders run off the request path:
+   - **Start command:** `npm run worker`
+   - It shares `DATABASE_URL` with the web service. Any number of API instances can pair with workers — job claiming is safe across processes.
+5. Environment variables:
    ```
    DATABASE_URL       = <Neon pooled connection string>
    JWT_SECRET         = <long random string>
@@ -435,9 +458,14 @@ The app deploys as three pieces: **Neon** (database) → **Render** (API) → **
    SHARE_LINK_DAYS    = 30
    SMTP_*             = <optional>
    STORAGE_DRIVER     = local
+   # Optional: background features
+   # REDIS_URL=redis://…        (shared cache + rate-limit store)
+   # WHATSAPP_TOKEN=… WHATSAPP_PHONE_NUMBER_ID=…
+   # SMS_PROVIDER=… SMS_API_KEY=…
+   # PAYMENT_PROVIDER=paystack PAYMENT_SECRET_KEY=… PAYMENT_WEBHOOK_SECRET=…
    ```
-   Do **not** set `PORT` — Render provides it.
-5. Note: with `STORAGE_DRIVER=local`, uploaded logos live on the Render instance's disk. For durable uploads across deploys, configure an external bucket or add the cloud storage driver.
+   Do **not** set `PORT` — Render provides it. Leave `INLINE_WORKER` unset when you run a dedicated worker.
+6. Note: with `STORAGE_DRIVER=local`, uploaded logos live on the Render instance's disk. For durable uploads across deploys, configure an external bucket or add the cloud storage driver.
 
 ### 11.3 Frontend — Vercel
 
@@ -455,6 +483,19 @@ The app deploys as three pieces: **Neon** (database) → **Render** (API) → **
 - Register a fresh account and create a business (this exercises DB writes end-to-end).
 - Sign in, create a customer, a quotation and convert it to an invoice.
 - Download an invoice PDF.
+- `GET https://<api>/api/flags` returns `{ "flags": { … } }`.
+- On the Render worker service, logs show `[worker] started` and `[scheduler] started`.
+
+### 11.5 CI/CD (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+- **Backend** — spins up a Postgres service, `npm ci`, `prisma generate`, `prisma migrate deploy`, `npm test`.
+- **Frontend** — `npm ci`, `npm run lint`, `npm run build`.
+
+`.github/workflows/migrate.yml` is a manual (`workflow_dispatch`) job that applies migrations to production using the `PRODUCTION_DATABASE_URL` repository secret — a break-glass path when Render's build step cannot reach the database. Render still runs `prisma migrate deploy` during its build, so day-to-day migrations need no extra step.
+
+A red CI run should block the deploy: as a branch-protection rule on `main`, require the CI jobs to pass before merging. Vercel/Render preview deployments are created automatically for pull requests.
 
 ---
 
