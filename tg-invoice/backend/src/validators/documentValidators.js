@@ -45,6 +45,8 @@ const documentBase = {
   notes: z.string().trim().max(3000).optional().or(z.literal('')),
   terms: z.string().trim().max(3000).optional().or(z.literal('')),
   items: z.array(baseItem).min(1, 'Add at least one item.').max(200),
+  // When true (default), custom line items are saved to Products & services.
+  saveCustomItems: z.boolean().optional().default(true),
 };
 
 export const quotationSchema = z.object({

@@ -79,7 +79,7 @@ export default function LineItems({ items, onChange, defaultTaxRate = 0 }) {
               <div className="mb-2 space-y-1.5 md:mb-0">
                 <input
                   className="input"
-                  placeholder="Description of work"
+                  placeholder="Type a new item or service…"
                   value={row.description}
                   onChange={(e) => update(i, { description: e.target.value })}
                 />
@@ -88,7 +88,7 @@ export default function LineItems({ items, onChange, defaultTaxRate = 0 }) {
                   value={row.productId || ''}
                   onChange={(e) => pickProduct(i, e.target.value)}
                 >
-                  <option value="">— Custom item —</option>
+                  <option value="">New / custom item — just type the description above</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} · {formatMoney(p.unitPrice, settings)}

@@ -49,6 +49,7 @@ export default function DocumentForm({ kind }) {
     status: isInvoice ? 'UNPAID' : 'DRAFT',
   });
   const [items, setItems] = useState([blankRow({ taxRate: settings.defaultTaxRate || 0 })]);
+  const [saveCustomItems, setSaveCustomItems] = useState(true);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(editing);
   const [busy, setBusy] = useState(false);
@@ -133,6 +134,7 @@ export default function DocumentForm({ kind }) {
       notes: form.notes,
       terms: form.terms,
       status: form.status,
+      saveCustomItems,
       items: items.map((it) => ({
         productId: it.productId || undefined,
         description: it.description.trim(),
@@ -246,6 +248,20 @@ export default function DocumentForm({ kind }) {
           </div>
           <LineItems items={items} onChange={setItems} defaultTaxRate={settings.defaultTaxRate || 0} />
           {errors.items && <p className="mt-2 text-xs text-rose-600">{errors.items}</p>}
+
+          <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              checked={saveCustomItems}
+              onChange={(e) => setSaveCustomItems(e.target.checked)}
+            />
+            <span className="text-xs leading-relaxed text-slate-600">
+              <span className="font-semibold text-slate-800">Save new items to Products &amp; services</span>
+              <br />
+              Anything you type here that isn’t already in your catalogue is added automatically, so you can reuse it next time. Items you pick from the list are never duplicated.
+            </span>
+          </label>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">

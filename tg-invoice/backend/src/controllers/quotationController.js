@@ -4,6 +4,7 @@ import { ok, created, parseListQuery, searchFilter } from '../utils/query.js';
 import { calculateDocumentTotals } from '../utils/money.js';
 import { allocateDocumentNumber } from '../services/sequenceService.js';
 import { logAudit } from '../services/auditService.js';
+import { saveCustomItemsAsProducts } from '../services/productCatalogService.js';
 import {
   getSettings,
   buildDocumentPdf,
@@ -104,9 +105,10 @@ export const createQuotation = asyncHandler(async (req, res) => {
   // Backend is the source of truth for every number on the document.
   const totals = calculateDocumentTotals(b.items);
 
-  const quotation = await prisma.$transaction(async (tx) => {
+  const { quotation, savedProducts } = await prisma.$transaction(async (tx) => {
+    const savedProducts = b.saveCustomItems === false ? [] : await saveCustomItemsAsProducts(tx, req.tenant.id, totals.items);
     const quotationNumber = await allocateDocumentNumber(tx, req.tenant.id, 'QUOTATION', settings);
-    return tx.quotation.create({
+    const quotation = await tx.quotation.create({
       data: {
         tenantId: req.tenant.id,
         customerId: b.customerId,
@@ -126,6 +128,7 @@ export const createQuotation = asyncHandler(async (req, res) => {
       },
       include,
     });
+    return { quotation, savedProducts };
   });
 
   await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'CREATE_QUOTATION', 'quotation', {
@@ -133,6 +136,7 @@ export const createQuotation = asyncHandler(async (req, res) => {
     entityLabel: quotation.quotationNumber,
     description: `${req.user.name} created quotation ${quotation.quotationNumber}`,
   });
+  await logSavedProducts(req, savedProducts);
 
   created(res, serialize(quotation));
 });
@@ -153,9 +157,10 @@ export const updateQuotation = asyncHandler(async (req, res) => {
   await assertTenantReferences(req.tenant.id, b);
   const totals = calculateDocumentTotals(b.items);
 
-  const quotation = await prisma.$transaction(async (tx) => {
+  const { quotation, savedProducts } = await prisma.$transaction(async (tx) => {
+    const savedProducts = b.saveCustomItems === false ? [] : await saveCustomItemsAsProducts(tx, req.tenant.id, totals.items);
     await tx.quotationItem.deleteMany({ where: { quotationId: existing.id } });
-    return tx.quotation.update({
+    const quotation = await tx.quotation.update({
       where: { id: existing.id },
       data: {
         customerId: b.customerId,
@@ -173,6 +178,7 @@ export const updateQuotation = asyncHandler(async (req, res) => {
       },
       include,
     });
+    return { quotation, savedProducts };
   });
 
   await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'UPDATE_QUOTATION', 'quotation', {
@@ -180,6 +186,7 @@ export const updateQuotation = asyncHandler(async (req, res) => {
     entityLabel: quotation.quotationNumber,
     description: `${req.user.name} edited quotation ${quotation.quotationNumber}`,
   });
+  await logSavedProducts(req, savedProducts);
 
   ok(res, serialize(quotation));
 });
@@ -427,6 +434,19 @@ export const quotationShare = asyncHandler(async (req, res) => {
 });
 
 /* ── helpers ──────────────────────────────────────────────────────── */
+
+/**
+ * Audit entry for custom line items that were auto-saved to the catalogue,
+ * so businesses can see where new Products & services came from.
+ */
+async function logSavedProducts(req, products) {
+  if (!products || products.length === 0) return;
+  const list = products.map((p) => p.name).join(', ');
+  await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'CREATE_PRODUCT', 'product', {
+    description: `${req.user.name} auto-saved ${products.length} custom item${products.length > 1 ? 's' : ''} to Products & services: ${list}`,
+    metadata: { productIds: products.map((p) => p.id) },
+  });
+}
 
 function serialize(q) {
   return { ...q, subtotal: Number(q.subtotal), discountAmount: Number(q.discountAmount), taxAmount: Number(q.taxAmount), total: Number(q.total) };

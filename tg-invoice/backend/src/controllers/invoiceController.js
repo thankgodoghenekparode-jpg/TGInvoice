@@ -5,6 +5,7 @@ import { calculateDocumentTotals, computeBalance, deriveInvoiceStatus } from '..
 import { allocateDocumentNumber } from '../services/sequenceService.js';
 import { logAudit } from '../services/auditService.js';
 import { notifyTenantAdmins } from '../services/notificationService.js';
+import { saveCustomItemsAsProducts } from '../services/productCatalogService.js';
 import {
   getSettings,
   buildDocumentPdf,
@@ -150,9 +151,10 @@ export const createInvoice = asyncHandler(async (req, res) => {
 
   const totals = calculateDocumentTotals(b.items);
 
-  const invoice = await prisma.$transaction(async (tx) => {
+  const { invoice, savedProducts } = await prisma.$transaction(async (tx) => {
+    const savedProducts = b.saveCustomItems === false ? [] : await saveCustomItemsAsProducts(tx, req.tenant.id, totals.items);
     const invoiceNumber = await allocateDocumentNumber(tx, req.tenant.id, 'INVOICE', settings);
-    return tx.invoice.create({
+    const invoice = await tx.invoice.create({
       data: {
         tenantId: req.tenant.id,
         customerId: b.customerId,
@@ -175,6 +177,7 @@ export const createInvoice = asyncHandler(async (req, res) => {
       },
       include: { customer: true, items: true },
     });
+    return { invoice, savedProducts };
   });
 
   await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'CREATE_INVOICE', 'invoice', {
@@ -182,6 +185,7 @@ export const createInvoice = asyncHandler(async (req, res) => {
     entityLabel: invoice.invoiceNumber,
     description: `${req.user.name} created invoice ${invoice.invoiceNumber}`,
   });
+  await logSavedProducts(req, savedProducts);
 
   created(res, serialize(invoice));
 });
@@ -205,9 +209,10 @@ export const updateInvoice = asyncHandler(async (req, res) => {
   await assertTenantReferences(req.tenant.id, b);
   const totals = calculateDocumentTotals(b.items);
 
-  const invoice = await prisma.$transaction(async (tx) => {
+  const { invoice, savedProducts } = await prisma.$transaction(async (tx) => {
+    const savedProducts = b.saveCustomItems === false ? [] : await saveCustomItemsAsProducts(tx, req.tenant.id, totals.items);
     await tx.invoiceItem.deleteMany({ where: { invoiceId: existing.id } });
-    return tx.invoice.update({
+    const invoice = await tx.invoice.update({
       where: { id: existing.id },
       data: {
         customerId: b.customerId,
@@ -227,6 +232,7 @@ export const updateInvoice = asyncHandler(async (req, res) => {
       },
       include: { customer: true, items: true },
     });
+    return { invoice, savedProducts };
   });
 
   await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'UPDATE_INVOICE', 'invoice', {
@@ -234,6 +240,7 @@ export const updateInvoice = asyncHandler(async (req, res) => {
     entityLabel: invoice.invoiceNumber,
     description: `${req.user.name} edited invoice ${invoice.invoiceNumber}`,
   });
+  await logSavedProducts(req, savedProducts);
 
   ok(res, serialize(invoice));
 });
@@ -483,6 +490,19 @@ export const invoiceShare = asyncHandler(async (req, res) => {
 });
 
 /* ── helpers ──────────────────────────────────────────────────────── */
+
+/**
+ * Audit entry for custom line items that were auto-saved to the catalogue,
+ * so businesses can see where new Products & services came from.
+ */
+async function logSavedProducts(req, products) {
+  if (!products || products.length === 0) return;
+  const list = products.map((p) => p.name).join(', ');
+  await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'CREATE_PRODUCT', 'product', {
+    description: `${req.user.name} auto-saved ${products.length} custom item${products.length > 1 ? 's' : ''} to Products & services: ${list}`,
+    metadata: { productIds: products.map((p) => p.id) },
+  });
+}
 
 function serialize(i) {
   return {
