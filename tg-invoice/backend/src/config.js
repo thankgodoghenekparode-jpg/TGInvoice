@@ -64,12 +64,15 @@ const config = {
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
     businessNumber: process.env.WHATSAPP_BUSINESS_NUMBER || '',
+    // Used to upgrade local numbers (0803…) to E.164 (234803…).
+    countryCode: process.env.WHATSAPP_COUNTRY_CODE || '234',
   },
 
   sms: {
     provider: process.env.SMS_PROVIDER || '', // termii | africas_talking | twilio
     apiKey: process.env.SMS_API_KEY || '',
     senderId: process.env.SMS_SENDER_ID || '',
+    username: process.env.SMS_USERNAME || '',
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
     from: process.env.SMS_FROM || '',

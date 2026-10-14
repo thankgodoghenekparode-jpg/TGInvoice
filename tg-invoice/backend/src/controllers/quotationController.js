@@ -5,6 +5,7 @@ import { calculateDocumentTotals } from '../utils/money.js';
 import { allocateDocumentNumber } from '../services/sequenceService.js';
 import { logAudit } from '../services/auditService.js';
 import { saveCustomItemsAsProducts } from '../services/productCatalogService.js';
+import { enqueue } from '../services/jobService.js';
 import {
   getSettings,
   buildDocumentPdf,
@@ -362,6 +363,11 @@ export const updateQuotationStatus = asyncHandler(async (req, res) => {
   if (existing.status === 'CONVERTED') throw errors.badRequest('Converted quotations cannot change status.');
 
   const quotation = await prisma.quotation.update({ where: { id: existing.id }, data: { status } });
+
+  // Marking a quotation SENT may trigger the tenant's automatic delivery.
+  if (status === 'SENT' && existing.status !== 'SENT') {
+    await enqueue('document.autoDeliver', { kind: 'QUOTATION', documentId: quotation.id, tenantId: req.tenant.id }).catch(() => {});
+  }
 
   await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'UPDATE_QUOTATION', 'quotation', {
     entityId: quotation.id,

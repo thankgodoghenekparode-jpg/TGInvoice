@@ -20,7 +20,14 @@ const CURRENCIES = [
 const EMPTY = {
   businessName: '', address: '', phone: '', email: '', website: '', taxId: '', country: '',
   currency: 'NGN', currencySymbol: '₦', currencyPosition: 'prefix',
+  autoSendChannels: [],
 };
+
+const DELIVERY_CHANNELS = [
+  { value: 'WHATSAPP', label: 'WhatsApp' },
+  { value: 'SMS', label: 'SMS' },
+  { value: 'EMAIL', label: 'Email' },
+];
 
 export default function CompanySettingsPage() {
   const toast = useToast();
@@ -47,10 +54,19 @@ export default function CompanySettingsPage() {
       currency: settings.currency || 'NGN',
       currencySymbol: settings.currencySymbol || '₦',
       currencyPosition: settings.currencyPosition || 'prefix',
+      autoSendChannels: Array.isArray(settings.autoSendChannels) ? settings.autoSendChannels : [],
     });
   }, [settings, loading]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const toggleChannel = (value) =>
+    setForm((f) => ({
+      ...f,
+      autoSendChannels: f.autoSendChannels.includes(value)
+        ? f.autoSendChannels.filter((c) => c !== value)
+        : [...f.autoSendChannels, value],
+    }));
 
   const pickCurrency = (code) => {
     const c = CURRENCIES.find((x) => x.code === code);
@@ -200,6 +216,27 @@ export default function CompanySettingsPage() {
                 <option key={c.code} value={c.code}>{c.label}</option>
               ))}
             </select>
+          </Field>
+          <Field
+            label="Auto-send documents"
+            hint="When you mark an invoice or quotation as sent, it is pushed automatically over these channels. Leave empty to send manually. Unconfigured channels are ignored."
+          >
+            <div className="flex flex-wrap gap-2">
+              {DELIVERY_CHANNELS.map((c) => {
+                const active = form.autoSendChannels.includes(c.value);
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => toggleChannel(c.value)}
+                    className={`btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
         </div>
 

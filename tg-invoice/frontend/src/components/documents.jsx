@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Download, Printer, Share2, Mail, X, Plus, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { Download, Printer, Share2, Mail, X, Plus, AlertTriangle, ArrowRightLeft, Send, MessageCircle, Smartphone } from 'lucide-react';
 import { api, apiMessage, apiFieldErrors } from '../services/api.js';
 import { downloadPdf, printPdf } from '../services/files.js';
 import { shareDocument, pdfFileName } from '../services/share.js';
+import { getMessagingStatus, deliverDocument } from '../services/messaging.js';
 import { formatMoney, amountInWords } from '../utils/currency.js';
 import { formatDate } from '../utils/dates.js';
 import { PAYMENT_METHODS, paymentMethodLabel } from '../utils/status.js';
@@ -346,6 +347,7 @@ export function DocumentPaper({ kind, doc, settings = {} }) {
 
 export function DocumentActions({ kind, id, reference, customer, subjectPrefix, onClose }) {
   const [emailOpen, setEmailOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const { activeTenant } = useAuth();
   const { settings } = useSettings();
@@ -440,6 +442,14 @@ export function DocumentActions({ kind, id, reference, customer, subjectPrefix, 
       <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEmailOpen(true)}>
         <Mail size={15} /> Email
       </button>
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        onClick={() => setSendOpen(true)}
+        title="Send automatically via WhatsApp, SMS or email"
+      >
+        <Send size={15} /> Send
+      </button>
       {onClose && (
         <button type="button" className="btn btn-ghost btn-sm ml-auto" onClick={onClose}>
           <X size={15} /> Close
@@ -454,6 +464,17 @@ export function DocumentActions({ kind, id, reference, customer, subjectPrefix, 
           subjectPrefix={subjectPrefix}
           defaultSubject={`${reference} from ${settings.businessName || activeTenant?.name || 'TG Invoice'}`}
           onClose={() => setEmailOpen(false)}
+        />
+      )}
+      {sendOpen && (
+        <SendModal
+          kind={kind}
+          id={id}
+          reference={reference}
+          customer={customer}
+          businessName={settings.businessName || activeTenant?.name}
+          defaultMessage={share?.text}
+          onClose={() => setSendOpen(false)}
         />
       )}
     </div>
@@ -518,6 +539,155 @@ export function EmailModal({ kind, id, reference, customer, defaultSubject, onCl
           </button>
           <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
             <Mail size={15} /> {busy ? 'Sending…' : 'Send email'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ── Send modal (WhatsApp / SMS / email, server-side delivery) ─────── */
+
+const CHANNEL_META = {
+  WHATSAPP: { label: 'WhatsApp', icon: MessageCircle, hint: 'Sends the PDF into the chat' },
+  SMS: { label: 'SMS', icon: Smartphone, hint: 'A short text with the link' },
+  EMAIL: { label: 'Email', icon: Mail, hint: 'The PDF is attached' },
+};
+
+/**
+ * Automatic delivery. The server does the sending (WhatsApp Cloud API / SMS /
+ * SMTP) and logs every attempt, so it works even if this tab is closed. Channels
+ * the deployment has not configured are shown as unavailable rather than
+ * silently failing.
+ */
+export function SendModal({ kind, id, reference, customer, businessName, defaultMessage, onClose }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [channels, setChannels] = useState(['WHATSAPP']);
+  const [to, setTo] = useState('');
+  const [message, setMessage] = useState('');
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getMessagingStatus()
+      .then((s) => {
+        if (!alive) return;
+        setStatus(s);
+        // Preselect the best available channel (prefer WhatsApp when live).
+        const available = ['WHATSAPP', 'SMS', 'EMAIL'].filter((c) => s[c.toLowerCase()]);
+        setChannels(available.length ? [available[0]] : ['EMAIL']);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const available = status ? Object.keys(CHANNEL_META).filter((c) => status[c.toLowerCase()]) : [];
+
+  const toggle = (channel) =>
+    setChannels((current) => (current.includes(channel) ? current.filter((c) => c !== channel) : [...current, channel]));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!channels.length) {
+      toast.info('Choose at least one channel.');
+      return;
+    }
+    setBusy(true);
+    setResult(null);
+    try {
+      const data = await deliverDocument(kind, id, {
+        channels,
+        to: to.trim() || undefined,
+        message: message.trim() || defaultMessage || undefined,
+      });
+      setResult(data);
+      const sent = data.results.filter((r) => r.sent);
+      if (sent.length) {
+        toast.success(`Sent via ${sent.map((r) => CHANNEL_META[r.channel]?.label || r.channel).join(', ')}.`);
+      } else {
+        toast.info('Nothing was delivered — check that the channel is configured and the customer has contact details.', 'Not sent');
+      }
+    } catch (err) {
+      toast.error(apiMessage(err, 'Could not send the document.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const kindLabel = kind === 'QUOTATION' ? 'quotation' : kind === 'RECEIPT' ? 'receipt' : 'invoice';
+
+  return (
+    <Modal open title={`Send ${reference}`} onClose={onClose} description="Delivered automatically from the server — you can close this tab.">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Channels" hint={available.length ? undefined : 'No delivery providers are configured yet — set WhatsApp/SMS/SMTP keys in the backend environment.'}>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(CHANNEL_META).map(([channel, meta]) => {
+              const Icon = meta.icon;
+              const enabled = !status || Boolean(status[channel.toLowerCase()]);
+              const active = channels.includes(channel);
+              return (
+                <button
+                  key={channel}
+                  type="button"
+                  onClick={() => enabled && toggle(channel)}
+                  disabled={!enabled}
+                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`}
+                  title={enabled ? meta.hint : 'Not configured on the server'}
+                >
+                  <Icon size={15} /> {meta.label}
+                  {!enabled && ' · off'}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        <Field label="Send to" hint={`Leave blank to use the customer's ${channels.includes('EMAIL') ? 'email' : 'phone number'} on file${customer?.phone ? ` (${customer.phone})` : ''}.`}>
+          <input
+            className="input"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder={customer?.phone || customer?.email || 'Phone number or email'}
+          />
+        </Field>
+
+        <Field label="Message">
+          <textarea
+            rows={6}
+            className="input"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder={defaultMessage || `Please find your ${kindLabel} ${reference} from ${businessName || 'us'}.`}
+          />
+        </Field>
+
+        {result && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+            <p className="mb-1 font-medium text-slate-700">Delivery result</p>
+            <ul className="space-y-1">
+              {result.results.map((r) => (
+                <li key={r.channel} className="flex items-center gap-2">
+                  <span className="font-medium">{CHANNEL_META[r.channel]?.label || r.channel}</span>
+                  <span className={r.sent ? 'text-emerald-600' : 'text-amber-600'}>
+                    {r.sent ? 'sent' : r.status === 'SKIPPED' ? `skipped${r.reason ? ` (${r.reason.replace(/_/g, ' ')})` : ''}` : 'failed'}
+                  </span>
+                  {r.error && <span className="text-slate-500">— {r.error}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+            {result ? 'Done' : 'Cancel'}
+          </button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !channels.length}>
+            <Send size={15} /> {busy ? 'Sending…' : 'Send now'}
           </button>
         </div>
       </form>

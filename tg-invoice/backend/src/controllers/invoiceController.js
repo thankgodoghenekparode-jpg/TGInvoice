@@ -6,6 +6,7 @@ import { allocateDocumentNumber } from '../services/sequenceService.js';
 import { logAudit } from '../services/auditService.js';
 import { notifyTenantAdmins } from '../services/notificationService.js';
 import { saveCustomItemsAsProducts } from '../services/productCatalogService.js';
+import { enqueue } from '../services/jobService.js';
 import {
   getSettings,
   buildDocumentPdf,
@@ -305,6 +306,10 @@ export const markInvoiceSent = asyncHandler(async (req, res) => {
     ['DRAFT', 'UNPAID'].includes(existing.status)
       ? await prisma.invoice.update({ where: { id: existing.id }, data: { status: 'SENT' } })
       : existing;
+
+  // If the business opted into automatic delivery, push the document out of
+  // band (the worker owns retries) — the request returns immediately.
+  await enqueue('document.autoDeliver', { kind: 'INVOICE', documentId: invoice.id, tenantId: req.tenant.id }).catch(() => {});
 
   ok(res, serialize(invoice));
 });

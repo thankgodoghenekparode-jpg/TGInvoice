@@ -8,6 +8,7 @@ import * as team from '../controllers/teamController.js';
 import * as audit from '../controllers/auditController.js';
 import * as search from '../controllers/searchController.js';
 import * as flags from '../controllers/featureFlagController.js';
+import * as messaging from '../controllers/messagingController.js';
 import { validate } from '../middleware/errorHandler.js';
 import { customerSchema, productSchema } from '../validators/documentValidators.js';
 
@@ -73,6 +74,12 @@ auditRouter.get('/', requireAdmin, audit.listAuditLogs);
 
 export const searchRouter = Router();
 searchRouter.get('/', search.globalSearch);
+
+/* ── Outbound messaging (delivery status + log) ───────────────────── */
+
+export const messageRouter = Router();
+messageRouter.get('/status', messaging.status);
+messageRouter.get('/', messaging.listLogs);
 
 /* ── Feature flags (public: login & marketing gate on them too) ──── */
 

@@ -6,6 +6,7 @@ import * as inv from '../controllers/invoiceController.js';
 import * as receipts from '../controllers/receiptController.js';
 import * as payments from '../controllers/paymentController.js';
 import * as reports from '../controllers/reportController.js';
+import * as messaging from '../controllers/messagingController.js';
 
 /* ── Quotations ───────────────────────────────────────────────────── */
 
@@ -21,6 +22,7 @@ quotationRouter.post('/:id/convert', q.convertQuotation);
 quotationRouter.put('/:id/status', q.updateQuotationStatus);
 quotationRouter.post('/:id/email', q.quotationEmail);
 quotationRouter.get('/:id/share', q.quotationShare);
+quotationRouter.post('/:id/deliver', messaging.deliver_document('QUOTATION'));
 
 /* ── Invoices ─────────────────────────────────────────────────────── */
 
@@ -37,6 +39,7 @@ invoiceRouter.post('/:id/send', inv.markInvoiceSent);
 invoiceRouter.post('/:id/payments', validate(paymentSchema), inv.recordPayment);
 invoiceRouter.post('/:id/email', inv.invoiceEmail);
 invoiceRouter.get('/:id/share', inv.invoiceShare);
+invoiceRouter.post('/:id/deliver', messaging.deliver_document('INVOICE'));
 
 /* ── Receipts ─────────────────────────────────────────────────────── */
 
@@ -47,6 +50,7 @@ receiptRouter.get('/:id/pdf', receipts.receiptPdf);
 receiptRouter.post('/:id/void', receipts.voidReceipt);
 receiptRouter.post('/:id/email', receipts.receiptEmail);
 receiptRouter.get('/:id/share', receipts.receiptShare);
+receiptRouter.post('/:id/deliver', messaging.deliver_document('RECEIPT'));
 
 /* ── Payments (tenant-wide history) ───────────────────────────────── */
 

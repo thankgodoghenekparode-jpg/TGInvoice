@@ -32,8 +32,10 @@ const EDITABLE = [
   'bankName', 'accountName', 'accountNumber', 'paymentInstructions',
   'invoicePrefix', 'quotationPrefix', 'receiptPrefix',
   'defaultTaxRate', 'defaultInvoiceNotes', 'defaultQuotationTerms', 'defaultReceiptNotes',
-  'onboardingComplete',
+  'onboardingComplete', 'autoSendChannels',
 ];
+
+const CHANNELS = ['EMAIL', 'WHATSAPP', 'SMS'];
 
 /** PUT /api/settings — OWNER/ADMIN only. */
 export const updateSettings = asyncHandler(async (req, res) => {
@@ -53,6 +55,12 @@ export const updateSettings = asyncHandler(async (req, res) => {
       if (!/^[A-Z0-9-]*$/.test(clean)) throw errors.badRequest('Prefixes may only contain letters, numbers and dashes.');
       data[p] = clean;
     }
+  }
+
+  // Auto-delivery channels: de-duplicate and drop anything unrecognised.
+  if ('autoSendChannels' in data) {
+    const raw = Array.isArray(data.autoSendChannels) ? data.autoSendChannels : [];
+    data.autoSendChannels = [...new Set(raw.filter((c) => CHANNELS.includes(c)))];
   }
 
   const settings = await prisma.companySettings.upsert({

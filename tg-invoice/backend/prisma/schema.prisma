@@ -353,6 +353,11 @@ model CompanySettings {
   defaultReceiptNotes   String?
 
   onboardingComplete Boolean  @default(false)
+
+  /// Channels a document is pushed through automatically when marked "sent".
+  /// Empty (default) = manual delivery only.
+  autoSendChannels   MessageChannel[] @default([])
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

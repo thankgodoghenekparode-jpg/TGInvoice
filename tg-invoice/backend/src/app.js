@@ -20,6 +20,7 @@ import {
   auditRouter,
   searchRouter,
   flagRouter,
+  messageRouter,
 } from './routes/core.routes.js';
 import {
   quotationRouter,
@@ -80,6 +81,7 @@ app.use('/api/reports', ...scoped, reportRouter);
 app.use('/api/team', ...scoped, teamRouter);
 app.use('/api/audit-logs', ...scoped, auditRouter);
 app.use('/api/search', ...scoped, searchRouter);
+app.use('/api/messages', ...scoped, messageRouter);
 
 /* ── Platform administration (super-admin) — hard-gated ───────────── */
 /* Driven by User.isPlatformAdmin, which NO tenant-facing flow can set.
