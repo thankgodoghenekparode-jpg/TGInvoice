@@ -35,6 +35,8 @@ const routes = [
   'settings/company',
   'settings/documents',
   'settings/reminders',
+  'settings/custom-fields',
+  'settings/templates',
   'settings/profile',
   '404',
 ];

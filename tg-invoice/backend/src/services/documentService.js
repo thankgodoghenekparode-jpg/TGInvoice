@@ -2,6 +2,8 @@ import { prisma } from '../prisma.js';
 import { errors, AppError } from '../utils/errors.js';
 import { sendMail } from './emailService.js';
 import { generateDocumentPdf, generateReceiptPdf } from './pdfService.js';
+import { getTemplate } from './templateService.js';
+import { loadPrintableFields } from './customFieldService.js';
 import { calculateLine } from '../utils/money.js';
 import { formatMoney, formatDate, paymentMethodLabel, whatsappMessage } from '../utils/format.js';
 import { signShareToken, publicDocumentUrl } from '../utils/shareToken.js';
@@ -41,16 +43,25 @@ const CUSTOMER_SELECT = {
 
 /** Attachments for documents: PDF + tenant branding in the message body. */
 export async function buildDocumentPdf({ kind, document, customer, settings, items, payment, invoice }) {
+  // Tenant branding/template + any custom fields flagged for printing.
+  const tenantId = document?.tenantId;
+  const [template, customFields] = tenantId
+    ? await Promise.all([
+        getTemplate(tenantId, kind).catch(() => null),
+        loadPrintableFields(tenantId, kind, document?.id).catch(() => []),
+      ])
+    : [null, []];
+
   if (kind === 'RECEIPT') {
-    return generateReceiptPdf({ document, payment, customer, invoice, settings });
+    return generateReceiptPdf({ document, payment, customer, invoice, settings, template, customFields });
   }
   if (kind === 'CREDIT_NOTE') {
     // CreditNoteItem stores no per-line discount/tax amounts — derive them for
     // display so the PDF columns are populated like every other document.
     const enriched = (items || []).map((it) => ({ ...it, ...calculateLine(it) }));
-    return generateDocumentPdf({ kind, document, customer, settings, items: enriched });
+    return generateDocumentPdf({ kind, document, customer, settings, items: enriched, template, customFields });
   }
-  return generateDocumentPdf({ kind, document, customer, settings, items });
+  return generateDocumentPdf({ kind, document, customer, settings, items, template, customFields });
 }
 
 /**

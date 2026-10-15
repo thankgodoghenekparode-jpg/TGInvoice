@@ -10,6 +10,7 @@ import {
 import { statusMeta } from '../../utils/status.js';
 import { formatDate } from '../../utils/dates.js';
 import Attachments from '../../components/Attachments.jsx';
+import CustomFieldsPanel from '../../components/CustomFieldsPanel.jsx';
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -247,6 +248,8 @@ export default function CustomerDetailPage() {
       </div>
 
       <Attachments documentKind="CUSTOMER" documentId={customer.id} title="Files" />
+
+      <CustomFieldsPanel entity="CUSTOMER" entityId={customer.id} title="Additional information" />
 
       <ConfirmDialog
         open={confirm}

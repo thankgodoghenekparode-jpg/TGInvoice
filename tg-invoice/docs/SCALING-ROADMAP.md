@@ -19,7 +19,7 @@ Legend: ✅ done · 🟡 partial · ⬜ planned
 - ✅ Automated WhatsApp (Cloud API) + SMS delivery — `src/services/messagingService.js`, `MessageLog`
 - ✅ Recurring invoices + automated reminders (dunning) — `src/services/recurringService.js`, `src/services/reminderService.js`, `RecurringInvoice`, `ReminderRule`, `ReminderSent`; UI at `/recurring` and `/settings/reminders`
 - ✅ Attachments on documents — `src/controllers/attachmentController.js`, `src/services/attachmentService.js`, `src/services/storageService.js`, `Attachment`; UI panel on every document detail page
-- ⬜ Custom fields + document templates — `CustomField`, `DocumentTemplate`
+- ✅ Custom fields + document templates — `src/controllers/customFieldController.js`, `src/controllers/documentTemplateController.js`, `src/services/customFieldService.js`, `src/services/templateService.js`; typed/validated values, print-on-PDF, per-kind accent/logo/bank/notes applied in `pdfService`; UI at `/settings/custom-fields`, `/settings/templates` and a panel on every detail page
 - ⬜ CSV/Excel import (customers, products) — `src/controllers/importController.js`
 - ✅ Credit notes / refunds / void — `src/controllers/creditNoteController.js`, `src/controllers/refundController.js`, `CreditNote`, `Refund`; UI at `/credit-notes` and `/refunds`
 - ⬜ Referrals/affiliates + reseller/accountant program — `ReferralCode`, `Referral`, `Partner`

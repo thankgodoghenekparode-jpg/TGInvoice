@@ -9,6 +9,7 @@ import {
 } from '../../components/ui.jsx';
 import { DocumentPaper, DocumentActions } from '../../components/documents.jsx';
 import Attachments from '../../components/Attachments.jsx';
+import CustomFieldsPanel from '../../components/CustomFieldsPanel.jsx';
 
 export default function ReceiptDetailPage() {
   const { id } = useParams();
@@ -120,6 +121,8 @@ export default function ReceiptDetailPage() {
       <DocumentPaper kind="RECEIPT" doc={receipt} settings={settings} />
 
       <Attachments documentKind="RECEIPT" documentId={receipt.id} />
+
+      <CustomFieldsPanel entity="RECEIPT" entityId={receipt.id} />
 
       <Modal
         open={voidOpen}

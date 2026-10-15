@@ -10,6 +10,7 @@ import {
 } from '../../components/ui.jsx';
 import { DocumentPaper, DocumentActions, RecordPaymentModal } from '../../components/documents.jsx';
 import Attachments from '../../components/Attachments.jsx';
+import CustomFieldsPanel from '../../components/CustomFieldsPanel.jsx';
 import { formatDateTime, formatDate } from '../../utils/dates.js';
 import { paymentMethodLabel } from '../../utils/status.js';
 
@@ -266,6 +267,8 @@ export default function InvoiceDetailPage() {
       </section>
 
       <Attachments documentKind="INVOICE" documentId={inv.id} />
+
+      <CustomFieldsPanel entity="INVOICE" entityId={inv.id} />
 
       {payOpen && (
         <RecordPaymentModal

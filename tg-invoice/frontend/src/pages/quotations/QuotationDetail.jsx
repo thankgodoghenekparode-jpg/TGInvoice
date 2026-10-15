@@ -9,6 +9,7 @@ import {
 } from '../../components/ui.jsx';
 import { DocumentPaper, DocumentActions, ConvertToInvoiceModal } from '../../components/documents.jsx';
 import Attachments from '../../components/Attachments.jsx';
+import CustomFieldsPanel from '../../components/CustomFieldsPanel.jsx';
 
 const STATUS_ACTIONS = [
   { value: 'SENT', label: 'Mark sent', icon: 'send' },
@@ -176,6 +177,8 @@ export default function QuotationDetailPage() {
       <DocumentPaper kind="QUOTATION" doc={q} settings={settings} />
 
       <Attachments documentKind="QUOTATION" documentId={q.id} />
+
+      <CustomFieldsPanel entity="QUOTATION" entityId={q.id} />
 
       {convertOpen && (
         <ConvertToInvoiceModal

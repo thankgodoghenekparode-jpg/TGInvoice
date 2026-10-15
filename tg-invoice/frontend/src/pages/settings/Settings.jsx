@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, FileText, UserCog, ArrowRight, Users, BellRing } from 'lucide-react';
+import { Building2, FileText, UserCog, ArrowRight, Users, BellRing, ListChecks, Palette } from 'lucide-react';
 import { PageHeader, Card } from '../../components/ui.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../hooks/useSettings.js';
@@ -22,6 +22,18 @@ const SECTIONS = [
     icon: BellRing,
     title: 'Payment reminders',
     description: 'Chase unpaid invoices automatically — before, on, or after the due date, by WhatsApp, SMS or email.',
+  },
+  {
+    to: '/settings/custom-fields',
+    icon: ListChecks,
+    title: 'Custom fields',
+    description: 'Track project codes, PO numbers and anything else your business needs on customers and documents.',
+  },
+  {
+    to: '/settings/templates',
+    icon: Palette,
+    title: 'Document templates',
+    description: 'Choose the accent colour, logo and notes printed on your invoices, quotations, receipts and credit notes.',
   },
   {
     to: '/settings/profile',

@@ -20,6 +20,10 @@ const INK = '#0F172A';
 const MUTED = '#64748B';
 const LINE = '#E2E8F0';
 const SOFT = '#F8FAFC';
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** Per-document accent — a saved template may override the brand blue. */
+const accentOf = (doc) => (HEX.test(doc.__accent || '') ? doc.__accent : ACCENT);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FONT_DIR = path.resolve(__dirname, '../../assets/fonts');
@@ -79,8 +83,9 @@ function customerLines(customer) {
 
 /* ── document frame ───────────────────────────────────────────────── */
 
-async function drawHeader(doc, { kind, settings, number, dateLabel, dateValue, extraMeta = [] }) {
+async function drawHeader(doc, { kind, settings, number, dateLabel, dateValue, extraMeta = [], template }) {
   const contentWidth = doc.page.width - PAGE_MARGIN * 2;
+  const accent = accentOf(doc);
   const title =
     kind === 'QUOTATION' ? 'QUOTATION'
       : kind === 'RECEIPT' ? 'RECEIPT'
@@ -88,9 +93,9 @@ async function drawHeader(doc, { kind, settings, number, dateLabel, dateValue, e
           : 'INVOICE';
 
   // Top accent bar
-  doc.rect(0, 0, doc.page.width, 6).fill(ACCENT);
+  doc.rect(0, 0, doc.page.width, 6).fill(accent);
 
-  const logoBuffer = await loadLogo(settings.logo);
+  const logoBuffer = template?.showLogo === false ? null : await loadLogo(settings.logo);
   let infoX = PAGE_MARGIN;
   let y = 34;
 
@@ -123,7 +128,7 @@ async function drawHeader(doc, { kind, settings, number, dateLabel, dateValue, e
 
   // Right: title + meta
   const rightX = doc.page.width - PAGE_MARGIN - 190;
-  doc.font('BodyBold').fontSize(21).fillColor(ACCENT)
+  doc.font('BodyBold').fontSize(21).fillColor(accent)
     .text(title, rightX, 34, { width: 190, align: 'right' });
   let my = 64;
   doc.font('BodyBold').fontSize(10).fillColor(INK)
@@ -271,8 +276,8 @@ function drawTotals(doc, y, { settings, subtotal, discountAmount, taxAmount, tot
 
   // Grand total
   doc.rect(x, ly - 2, w, 26).fill('#EFF6FF');
-  txt(doc, kind === 'RECEIPT' ? 'AMOUNT' : 'TOTAL', { x: x + 8, y: ly + 6, size: 9, bold: true, color: ACCENT, width: 90 });
-  txt(doc, money(total, settings), { x: x + w - 138, y: ly + 3, size: 13, bold: true, color: ACCENT, width: 130, align: 'right' });
+  txt(doc, kind === 'RECEIPT' ? 'AMOUNT' : 'TOTAL', { x: x + 8, y: ly + 6, size: 9, bold: true, color: accentOf(doc), width: 90 });
+  txt(doc, money(total, settings), { x: x + w - 138, y: ly + 3, size: 13, bold: true, color: accentOf(doc), width: 130, align: 'right' });
   ly += 32;
 
   if (kind === 'INVOICE') {
@@ -283,8 +288,10 @@ function drawTotals(doc, y, { settings, subtotal, discountAmount, taxAmount, tot
   return ly + 6;
 }
 
-function drawPaymentInfo(doc, y, settings) {
-  const hasBank = settings.bankName || settings.accountName || settings.accountNumber;
+function drawPaymentInfo(doc, y, settings, template) {
+  const showBank = template?.showBankDetails !== false;
+  const bank = [settings.bankName, settings.accountName, settings.accountNumber].filter(Boolean);
+  const hasBank = showBank && bank.length > 0;
   if (!hasBank && !settings.paymentInstructions) return y;
 
   const w = 285;
@@ -293,9 +300,11 @@ function drawPaymentInfo(doc, y, settings) {
   let ly = y + 10;
   txt(doc, 'PAYMENT INFORMATION', { x: PAGE_MARGIN + 12, y: ly, size: 7.5, bold: true, color: MUTED, letterSpacing: 0.8 });
   ly += 15;
-  if (settings.bankName) { txt(doc, `Bank: ${settings.bankName}`, { x: PAGE_MARGIN + 12, y: ly, size: 8.5 }); ly += 13; }
-  if (settings.accountName) { txt(doc, `Account Name: ${settings.accountName}`, { x: PAGE_MARGIN + 12, y: ly, size: 8.5 }); ly += 13; }
-  if (settings.accountNumber) { txt(doc, `Account Number: ${settings.accountNumber}`, { x: PAGE_MARGIN + 12, y: ly, size: 8.5 }); ly += 13; }
+  if (hasBank) {
+    if (settings.bankName) { txt(doc, `Bank: ${settings.bankName}`, { x: PAGE_MARGIN + 12, y: ly, size: 8.5 }); ly += 13; }
+    if (settings.accountName) { txt(doc, `Account Name: ${settings.accountName}`, { x: PAGE_MARGIN + 12, y: ly, size: 8.5 }); ly += 13; }
+    if (settings.accountNumber) { txt(doc, `Account Number: ${settings.accountNumber}`, { x: PAGE_MARGIN + 12, y: ly, size: 8.5 }); ly += 13; }
+  }
   if (settings.paymentInstructions) {
     ly += 3;
     txt(doc, settings.paymentInstructions, { x: PAGE_MARGIN + 12, y: ly, size: 8, color: MUTED, width: w - 24 });
@@ -316,7 +325,30 @@ function drawNotesAndTerms(doc, y, { notes, terms, width }) {
   return y;
 }
 
-function stampFooters(doc, { settings }) {
+/** A template's header note, printed under the document header. */
+function drawHeaderNote(doc, y, note) {
+  if (!note) return y;
+  const w = doc.page.width - PAGE_MARGIN * 2;
+  txt(doc, note, { x: PAGE_MARGIN, y, size: 8.5, color: MUTED, width: w });
+  return y + doc.heightOfString(note, { width: w, fontSize: 8.5 }) + 10;
+}
+
+/** Tenant-defined custom fields flagged for printing (label: value rows). */
+function drawCustomFields(doc, y, fields) {
+  if (!fields || fields.length === 0) return y;
+  const w = 500;
+  txt(doc, 'ADDITIONAL INFORMATION', { x: PAGE_MARGIN, y, size: 7.5, bold: true, color: MUTED, letterSpacing: 0.8, width: w });
+  y += 14;
+  for (const f of fields) {
+    txt(doc, String(f.label), { x: PAGE_MARGIN, y, size: 8.5, bold: true, color: MUTED, width: 150 });
+    txt(doc, String(f.value), { x: PAGE_MARGIN + 160, y, size: 8.5, width: w - 160 });
+    y += 14;
+  }
+  return y + 8;
+}
+
+function stampFooters(doc) {
+  const settings = doc.__settings || {};
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(range.start + i);
@@ -324,7 +356,7 @@ function stampFooters(doc, { settings }) {
     doc.moveTo(PAGE_MARGIN, y - 8).lineTo(doc.page.width - PAGE_MARGIN, y - 8).lineWidth(0.5).stroke(LINE);
     doc.font('Body').fontSize(7.5).fillColor(MUTED);
     doc.text(
-      `Thank you for doing business with ${settings.businessName || settings.name || ''}.`,
+      doc.__footerNote || `Thank you for doing business with ${settings.businessName || settings.name || ''}.`,
       PAGE_MARGIN, y, { width: doc.page.width - PAGE_MARGIN * 2, align: 'center', lineBreak: false }
     );
     doc.text(`Page ${i + 1} of ${range.count}`, PAGE_MARGIN, y + 11, {
@@ -347,7 +379,7 @@ function createDoc() {
 }
 
 function finish(doc) {
-  stampFooters(doc, { settings: doc.__settings || {} });
+  stampFooters(doc);
   return new Promise((resolve, reject) => {
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
@@ -362,12 +394,15 @@ function finish(doc) {
 /**
  * Generate quotation / invoice / credit note PDF.
  * @param {{ kind: 'QUOTATION'|'INVOICE'|'CREDIT_NOTE', document: object,
- *           customer: object, settings: object, items: Array, payments?: Array }} input
+ *           customer: object, settings: object, items: Array, template?: object,
+ *           customFields?: Array }} input
  * @returns {Promise<Buffer>}
  */
-export async function generateDocumentPdf({ kind, document: docData, customer, settings, items }) {
+export async function generateDocumentPdf({ kind, document: docData, customer, settings, items, template = null, customFields = [] }) {
   const doc = createDoc();
   doc.__settings = settings;
+  doc.__accent = template?.accentColor || null;
+  doc.__footerNote = template?.footerNote || null;
 
   const isInvoice = kind === 'INVOICE';
   const isCredit = kind === 'CREDIT_NOTE';
@@ -380,6 +415,7 @@ export async function generateDocumentPdf({ kind, document: docData, customer, s
   let y = await drawHeader(doc, {
     kind,
     settings,
+    template,
     number,
     dateLabel: isCredit ? 'Credit Note Date' : isInvoice ? 'Invoice Date' : 'Quotation Date',
     dateValue: isCredit ? docData.creditNoteDate : isInvoice ? docData.invoiceDate : docData.quotationDate,
@@ -390,12 +426,14 @@ export async function generateDocumentPdf({ kind, document: docData, customer, s
         : [['Valid Until', formatDate(docData.validUntil)], ['Reference', docData.reference || '—']],
   });
 
+  y = drawHeaderNote(doc, y, template?.headerNote);
+
   y = drawBillTo(doc, customer, y);
 
   const creditLeft = round2(Number(docData.total) - Number(docData.amountApplied || 0));
   const sideLines = isCredit
     ? [
-        { label: 'CREDIT TOTAL', value: money(docData.total, settings), big: true, color: ACCENT },
+        { label: 'CREDIT TOTAL', value: money(docData.total, settings), big: true, color: accentOf(doc) },
         { label: 'APPLIED', value: money(docData.amountApplied || 0, settings) },
         { label: 'CREDIT REMAINING', value: money(creditLeft, settings) },
       ]
@@ -405,7 +443,7 @@ export async function generateDocumentPdf({ kind, document: docData, customer, s
           { label: 'DUE DATE', value: formatDate(docData.dueDate) || '—' },
         ]
       : [
-          { label: 'TOTAL', value: money(docData.total, settings), big: true, color: ACCENT },
+          { label: 'TOTAL', value: money(docData.total, settings), big: true, color: accentOf(doc) },
           { label: 'VALID UNTIL', value: formatDate(docData.validUntil) || '—' },
         ];
   y = Math.max(y, drawSideBox(doc, sideLines, y - 4));
@@ -423,12 +461,13 @@ export async function generateDocumentPdf({ kind, document: docData, customer, s
   });
 
   const infoY = Math.min(y, doc.page.height - 200);
-  const afterInfo = drawPaymentInfo(doc, infoY, settings);
-  drawNotesAndTerms(doc, afterInfo, {
+  const afterInfo = drawPaymentInfo(doc, infoY, settings, template);
+  let afterNotes = drawNotesAndTerms(doc, afterInfo, {
     notes: [docData.reason ? `Reason: ${docData.reason}` : null, docData.notes].filter(Boolean).join('\n\n'),
     terms: docData.terms,
     width: 500,
   });
+  afterNotes = drawCustomFields(doc, afterNotes, customFields);
 
   return finish(doc);
 }
@@ -440,18 +479,23 @@ const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
  * @param {{ document: object, payment: object, customer: object,
  *           invoice: object, settings: object }} input
  */
-export async function generateReceiptPdf({ document: r, payment, customer, invoice, settings }) {
+export async function generateReceiptPdf({ document: r, payment, customer, invoice, settings, template = null, customFields = [] }) {
   const doc = createDoc();
   doc.__settings = settings;
+  doc.__accent = template?.accentColor || null;
+  doc.__footerNote = template?.footerNote || null;
 
   let y = await drawHeader(doc, {
     kind: 'RECEIPT',
     settings,
+    template,
     number: r.receiptNumber,
     dateLabel: 'Receipt Date',
     dateValue: r.receiptDate,
     extraMeta: [['Reference', r.reference || payment?.reference || '—']],
   });
+
+  y = drawHeaderNote(doc, y, template?.headerNote);
 
   y = drawBillTo(doc, customer, y);
 
@@ -491,8 +535,9 @@ export async function generateReceiptPdf({ document: r, payment, customer, invoi
   });
   y += 66;
 
-  const afterInfo = drawPaymentInfo(doc, y, settings);
-  drawNotesAndTerms(doc, afterInfo, { notes: r.notes || settings.defaultReceiptNotes, width: 500 });
+  const afterInfo = drawPaymentInfo(doc, y, settings, template);
+  let afterNotes = drawNotesAndTerms(doc, afterInfo, { notes: r.notes || settings.defaultReceiptNotes, width: 500 });
+  afterNotes = drawCustomFields(doc, afterNotes, customFields);
 
   return finish(doc);
 }
