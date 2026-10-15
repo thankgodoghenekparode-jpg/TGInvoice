@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   LayoutDashboard, FileText, Users, Package, BarChart3, Settings as SettingsIcon,
-  UserRound, LogOut, ChevronDown, Plus, Search, Menu, X, Building2, Download, ShieldCheck,
+  UserRound, LogOut, ChevronDown, Plus, Search, Menu, X, Building2, Download, ShieldCheck, Gift,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api, { apiMessage } from '../services/api';
@@ -26,6 +26,7 @@ const NAV = [
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/products', label: 'Products & Services', icon: Package },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/referrals', label: 'Referrals', icon: Gift },
   { to: '/team', label: 'Team', icon: UserRound },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
@@ -102,10 +103,14 @@ function MobileTabBar({ onMore }) {
 /* ── Sidebar ──────────────────────────────────────────────────────── */
 
 function SidebarNav({ onNavigate }) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  // The referral programme is owner/admin-only, so staff don't see a door
+  // they cannot open (the server enforces it regardless).
+  const canSeeReferrals = role === 'OWNER' || role === 'ADMIN';
+  const base = canSeeReferrals ? NAV : NAV.filter((item) => item.to !== '/referrals');
   const items = user?.isPlatformAdmin
-    ? [...NAV, { to: '/admin', label: 'Platform Admin', icon: ShieldCheck }]
-    : NAV;
+    ? [...base, { to: '/admin', label: 'Platform Admin', icon: ShieldCheck }]
+    : base;
   return (
     <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
       {items.map((item, i) =>

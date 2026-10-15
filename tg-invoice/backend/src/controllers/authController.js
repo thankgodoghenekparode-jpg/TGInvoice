@@ -5,6 +5,7 @@ import { ok, created } from '../utils/query.js';
 import config from '../config.js';
 import { logAudit } from '../services/auditService.js';
 import { sendMail } from '../services/emailService.js';
+import { attributeReferral } from '../services/referralService.js';
 import {
   signAccessToken,
   issueRefreshToken,
@@ -118,6 +119,11 @@ export const register = asyncHandler(async (req, res) => {
     entityLabel: tenant.name,
     description: `${user.name} created business ${tenant.name}`,
   });
+
+  // Referral attribution is best-effort: a bad or used-up code never blocks signup.
+  if (body.referralCode) {
+    await attributeReferral({ code: body.referralCode, referredTenantId: tenant.id, referredUserId: user.id });
+  }
 
   const memberships = await membershipsFor(user.id);
 

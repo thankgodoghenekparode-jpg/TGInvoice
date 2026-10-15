@@ -13,6 +13,7 @@ export const registerSchema = z.object({
   email,
   password,
   confirmPassword: z.string().optional(),
+  referralCode: z.string().trim().max(16, 'Referral codes are at most 16 characters.').optional().or(z.literal('')),
   business: z.object({
     name: z.string().trim().min(2, 'Business name is required.').max(160),
     phone: z.string().trim().max(40).optional().or(z.literal('')),

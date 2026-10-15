@@ -1,6 +1,7 @@
 import systemHandlers, { periodicTasks as systemTasks } from './system.js';
 import documentHandlers, { periodicTasks as documentTasks } from './documents.js';
 import billingHandlers, { periodicTasks as billingTasks } from './billing.js';
+import growthHandlers, { periodicTasks as growthTasks } from './growth.js';
 
 /**
  * Job handler registry. Each feature module exports:
@@ -19,6 +20,7 @@ function register(map) {
 register(systemHandlers);
 register(documentHandlers);
 register(billingHandlers);
+register(growthHandlers);
 // Feature modules register here as they land.
 
 export function getHandler(type) {
@@ -29,4 +31,4 @@ export function jobTypes() {
   return [...handlers.keys()];
 }
 
-export const periodicTasks = [...systemTasks, ...documentTasks, ...billingTasks];
+export const periodicTasks = [...systemTasks, ...documentTasks, ...billingTasks, ...growthTasks];

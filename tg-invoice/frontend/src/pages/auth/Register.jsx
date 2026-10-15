@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { UserPlus, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertCircle, BadgeCheck, UserPlus, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { apiMessage, apiFieldErrors } from '../../services/api.js';
+import { lookupReferralCode } from '../../services/referrals.js';
+import { useDebounced } from '../../hooks/useList.js';
 import { CURRENCY_PRESETS } from '../../utils/currency.js';
 import AuthLayout from './AuthLayout.jsx';
 
@@ -11,18 +13,43 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState({});
+  // ?ref=TG7K2M4 prefills the invite code the visitor arrived with.
+  const inviteCode = (searchParams.get('ref') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
+    referralCode: inviteCode,
     business: { name: '', phone: '', country: 'Nigeria', currency: 'NGN' },
   });
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const setBusiness = (patch) => setForm((f) => ({ ...f, business: { ...f.business, ...patch } }));
+
+  /* Live invite-code check, so the visitor sees who invited them before signing up. */
+  const debouncedCode = useDebounced(form.referralCode, 400);
+  const [invite, setInvite] = useState(null);
+
+  useEffect(() => {
+    if (!debouncedCode) return undefined;
+    let cancelled = false;
+    lookupReferralCode(debouncedCode)
+      .then((data) => {
+        if (!cancelled) setInvite({ code: debouncedCode, ...data });
+      })
+      .catch(() => {
+        if (!cancelled) setInvite(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedCode]);
+
+  const inviteInfo = invite && invite.code === debouncedCode ? invite : null;
 
   const rules = [
     { ok: form.password.length >= 8, text: 'At least 8 characters' },
@@ -43,6 +70,7 @@ export default function RegisterPage() {
         email: form.email.trim(),
         password: form.password,
         confirmPassword: form.confirmPassword,
+        referralCode: form.referralCode.trim() || undefined,
         business: {
           name: form.business.name.trim(),
           phone: form.business.phone,
@@ -185,6 +213,29 @@ export default function RegisterPage() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4">
+          <label className="label" htmlFor="referralCode">Referral code (optional)</label>
+          <input
+            id="referralCode"
+            className="input font-mono uppercase"
+            value={form.referralCode}
+            onChange={(e) => set({ referralCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })}
+            placeholder="e.g. TG7K2M4"
+            maxLength={16}
+            autoComplete="off"
+          />
+          {inviteInfo?.valid && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
+              <BadgeCheck size={13} className="shrink-0" /> Invited by {inviteInfo.ownerLabel || 'another business'} — you are using their code.
+            </p>
+          )}
+          {inviteInfo && !inviteInfo.valid && form.referralCode && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-600">
+              <AlertCircle size={13} className="shrink-0" /> {inviteInfo.reason || 'That code is not recognised. You can still sign up.'}
+            </p>
+          )}
         </div>
 
         <button type="submit" className="btn btn-primary w-full" disabled={busy || !valid}>

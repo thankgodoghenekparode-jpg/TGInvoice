@@ -94,6 +94,9 @@ const config = {
   platform: {
     // Public web app URL — used for referral links and reseller signup.
     appUrl: process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173',
+    // Default value a PERCENT referral reward is calculated from when no
+    // explicit amount is supplied while crediting a reward.
+    planValue: Number(process.env.PLAN_VALUE) || 0,
   },
 };
 

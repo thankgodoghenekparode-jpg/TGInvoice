@@ -37,6 +37,7 @@ import CreditNoteNewPage from './pages/credit-notes/CreditNoteForm.jsx';
 import CreditNoteEditPage from './pages/credit-notes/CreditNoteForm.jsx';
 import CreditNoteDetailPage from './pages/credit-notes/CreditNoteDetail.jsx';
 import RefundsPage from './pages/refunds/Refunds.jsx';
+import ReferralsPage from './pages/Referrals.jsx';
 import ReportsPage from './pages/Reports.jsx';
 import TeamPage from './pages/Team.jsx';
 import SettingsPage from './pages/settings/Settings.jsx';
@@ -130,6 +131,8 @@ export default function App() {
           <Route path="/credit-notes/:id" element={<CreditNoteDetailPage />} />
 
           <Route path="/refunds" element={<RefundsPage />} />
+
+          <Route path="/referrals" element={<ReferralsPage />} />
 
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/team" element={<TeamPage />} />

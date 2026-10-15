@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import {
   ShieldCheck, Building2, Users as UsersIcon, FileText, Banknote,
   ArrowLeft, LogOut, Search, RefreshCw, Mail, CheckCircle2, AlertCircle,
-  LayoutDashboard, Menu, X, Plus, Ban, Power, Trash2, UserPlus, KeyRound, Copy,
+  LayoutDashboard, Menu, X, Plus, Ban, Power, Trash2, UserPlus, KeyRound, Copy, Handshake,
 } from 'lucide-react';
 import api, { apiMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -17,6 +17,7 @@ import {
 } from '../../components/ui.jsx';
 import { formatCompact, CURRENCY_PRESETS } from '../../utils/currency.js';
 import { formatDate } from '../../utils/dates.js';
+import GrowthPanel from './Growth.jsx';
 
 /**
  * Platform administration (super-admin).
@@ -51,6 +52,10 @@ const VIEW_META = {
   users: {
     title: 'Platform admins',
     desc: 'Users of the super-admin platform — the operators who can manage every business. Tenant staff are managed by each business\u2019s own admins.',
+  },
+  growth: {
+    title: 'Growth',
+    desc: 'Reseller, accountant and affiliate partners, plus every business referred into the platform and the rewards credited to them.',
   },
 };
 
@@ -292,6 +297,7 @@ export default function AdminPage() {
   const NAV = [
     { value: 'overview', label: 'Overview', icon: LayoutDashboard },
     { value: 'tenants', label: 'Businesses', icon: Building2, count: counts?.tenants },
+    { value: 'growth', label: 'Growth', icon: Handshake },
     { value: 'users', label: 'Platform admins', icon: ShieldCheck, count: counts?.platformAdmins },
   ];
 
@@ -524,6 +530,8 @@ export default function AdminPage() {
               )}
             </div>
           )}
+
+          {view === 'growth' && <GrowthPanel onRefreshOverview={loadOverview} />}
         </main>
       </div>
 

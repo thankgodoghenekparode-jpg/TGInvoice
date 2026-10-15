@@ -3,6 +3,8 @@ import { requireAuth, requirePlatformAdmin } from '../middleware/auth.js';
 import { validate } from '../middleware/errorHandler.js';
 import * as admin from '../controllers/adminController.js';
 import * as flags from '../controllers/featureFlagController.js';
+import * as referral from '../controllers/referralController.js';
+import { partnerRouter } from './partner.routes.js';
 import {
   createTenantSchema,
   updateTenantSchema,
@@ -11,6 +13,7 @@ import {
   createPlatformUserSchema,
   setMemberExpirySchema,
 } from '../validators/adminValidators.js';
+import { rewardReferralSchema } from '../validators/referralValidators.js';
 
 /**
  * Platform administration (super-admin) routes.
@@ -52,5 +55,10 @@ router.patch('/users/:id/platform-admin', validate(setPlatformAdminSchema), admi
 router.get('/flags', flags.adminList);
 router.put('/flags', flags.adminUpsert);
 router.delete('/flags/:id', flags.adminRemove);
+
+/* Growth: partners (reseller / accountant / affiliate) + referral rewards */
+router.use('/partners', partnerRouter);
+router.get('/referrals', referral.adminList);
+router.post('/referrals/:id/reward', validate(rewardReferralSchema), referral.adminReward);
 
 export default router;

@@ -3,6 +3,7 @@ import { prisma } from '../prisma.js';
 import { errors, AppError, asyncHandler } from '../utils/errors.js';
 import { verifyShareToken } from '../utils/shareToken.js';
 import { getSettings, buildDocumentPdf } from '../services/documentService.js';
+import { validateCode } from '../services/referralService.js';
 
 const router = Router();
 
@@ -90,6 +91,21 @@ router.get(
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.send(buffer);
+  })
+);
+
+/**
+ * GET /api/public/referral/:code
+ *
+ * Lets the register page greet an invited visitor ("Invited by Zarox Energy").
+ * Unknown, disabled and exhausted codes all come back `valid: false`, so this
+ * cannot be used to enumerate working codes.
+ */
+router.get(
+  '/referral/:code',
+  asyncHandler(async (req, res) => {
+    const info = await validateCode(req.params.code);
+    res.json({ success: true, data: info });
   })
 );
 

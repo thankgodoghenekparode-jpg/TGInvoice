@@ -29,6 +29,7 @@ const routes = [
   'credit-notes',
   'credit-notes/new',
   'refunds',
+  'referrals',
   'reports',
   'team',
   'settings',

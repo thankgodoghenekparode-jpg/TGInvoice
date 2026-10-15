@@ -34,6 +34,7 @@ import { creditNoteRouter, refundRouter } from './routes/creditNote.routes.js';
 import { attachmentRouter } from './routes/attachment.routes.js';
 import { customFieldRouter, documentTemplateRouter } from './routes/customization.routes.js';
 import { importRouter } from './routes/import.routes.js';
+import { referralRouter } from './routes/referral.routes.js';
 
 const app = express();
 
@@ -95,6 +96,7 @@ app.use('/api/attachments', ...scoped, attachmentRouter);
 app.use('/api/custom-fields', ...scoped, customFieldRouter);
 app.use('/api/document-templates', ...scoped, documentTemplateRouter);
 app.use('/api/imports', ...scoped, importRouter);
+app.use('/api/referrals', ...scoped, referralRouter);
 
 /* ── Platform administration (super-admin) — hard-gated ───────────── */
 /* Driven by User.isPlatformAdmin, which NO tenant-facing flow can set.
