@@ -9,6 +9,7 @@ import {
 } from '../../components/ui.jsx';
 import { statusMeta } from '../../utils/status.js';
 import { formatDate } from '../../utils/dates.js';
+import Attachments from '../../components/Attachments.jsx';
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -244,6 +245,8 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       </div>
+
+      <Attachments documentKind="CUSTOMER" documentId={customer.id} title="Files" />
 
       <ConfirmDialog
         open={confirm}

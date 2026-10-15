@@ -8,6 +8,7 @@ import { useSettings } from '../../hooks/useSettings.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, LoadingBlock, ConfirmDialog, StatusBadge, Modal, Button, Field } from '../../components/ui.jsx';
 import { DocumentPaper, DocumentActions } from '../../components/documents.jsx';
+import Attachments from '../../components/Attachments.jsx';
 import { paymentMethodLabel } from '../../utils/status.js';
 import { formatDateTime } from '../../utils/dates.js';
 
@@ -157,6 +158,8 @@ export default function CreditNoteDetailPage() {
       )}
 
       <DocumentPaper kind="CREDIT_NOTE" doc={cn} settings={settings} />
+
+      <Attachments documentKind="CREDIT_NOTE" documentId={cn.id} />
 
       {applied > 0 && (
         <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-800">

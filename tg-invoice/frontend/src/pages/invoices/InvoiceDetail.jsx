@@ -9,6 +9,7 @@ import {
   PageHeader, LoadingBlock, ConfirmDialog, StatusBadge, Modal, Button, Field, th, td, trHover,
 } from '../../components/ui.jsx';
 import { DocumentPaper, DocumentActions, RecordPaymentModal } from '../../components/documents.jsx';
+import Attachments from '../../components/Attachments.jsx';
 import { formatDateTime, formatDate } from '../../utils/dates.js';
 import { paymentMethodLabel } from '../../utils/status.js';
 
@@ -263,6 +264,8 @@ export default function InvoiceDetailPage() {
           )}
         </div>
       </section>
+
+      <Attachments documentKind="INVOICE" documentId={inv.id} />
 
       {payOpen && (
         <RecordPaymentModal

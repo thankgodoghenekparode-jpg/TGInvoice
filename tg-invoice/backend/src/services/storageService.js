@@ -32,6 +32,10 @@ class LocalDriver {
       /* already gone */
     }
   }
+
+  async read(key) {
+    return fs.readFile(path.join(this.baseDir, key));
+  }
 }
 
 const drivers = {
@@ -66,4 +70,15 @@ export async function deleteFile(key) {
   await driver.remove(key);
 }
 
-export default { saveFile, deleteFile, getPublicUrl };
+/** Read a stored file back into memory (used to stream downloads). */
+export async function readFile(key) {
+  if (!key) throw new Error('No storage key given');
+  if (/^https?:\/\//.test(key)) {
+    const res = await fetch(key);
+    if (!res.ok) throw new Error(`Could not fetch ${key}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+  return driver.read(key);
+}
+
+export default { saveFile, deleteFile, readFile, getPublicUrl };

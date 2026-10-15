@@ -18,7 +18,7 @@ Legend: ✅ done · 🟡 partial · ⬜ planned
 ## Features
 - ✅ Automated WhatsApp (Cloud API) + SMS delivery — `src/services/messagingService.js`, `MessageLog`
 - ✅ Recurring invoices + automated reminders (dunning) — `src/services/recurringService.js`, `src/services/reminderService.js`, `RecurringInvoice`, `ReminderRule`, `ReminderSent`; UI at `/recurring` and `/settings/reminders`
-- ⬜ Attachments on documents — `src/controllers/attachmentController.js`, `Attachment`
+- ✅ Attachments on documents — `src/controllers/attachmentController.js`, `src/services/attachmentService.js`, `src/services/storageService.js`, `Attachment`; UI panel on every document detail page
 - ⬜ Custom fields + document templates — `CustomField`, `DocumentTemplate`
 - ⬜ CSV/Excel import (customers, products) — `src/controllers/importController.js`
 - ✅ Credit notes / refunds / void — `src/controllers/creditNoteController.js`, `src/controllers/refundController.js`, `CreditNote`, `Refund`; UI at `/credit-notes` and `/refunds`

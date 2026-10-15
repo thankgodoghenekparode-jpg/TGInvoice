@@ -31,6 +31,7 @@ import {
 } from './routes/document.routes.js';
 import { recurringRouter, reminderRouter } from './routes/billing.routes.js';
 import { creditNoteRouter, refundRouter } from './routes/creditNote.routes.js';
+import { attachmentRouter } from './routes/attachment.routes.js';
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use('/api/team', ...scoped, teamRouter);
 app.use('/api/audit-logs', ...scoped, auditRouter);
 app.use('/api/search', ...scoped, searchRouter);
 app.use('/api/messages', ...scoped, messageRouter);
+app.use('/api/attachments', ...scoped, attachmentRouter);
 
 /* ── Platform administration (super-admin) — hard-gated ───────────── */
 /* Driven by User.isPlatformAdmin, which NO tenant-facing flow can set.

@@ -8,6 +8,7 @@ import {
   PageHeader, LoadingBlock, ConfirmDialog, StatusBadge, Badge,
 } from '../../components/ui.jsx';
 import { DocumentPaper, DocumentActions, ConvertToInvoiceModal } from '../../components/documents.jsx';
+import Attachments from '../../components/Attachments.jsx';
 
 const STATUS_ACTIONS = [
   { value: 'SENT', label: 'Mark sent', icon: 'send' },
@@ -173,6 +174,8 @@ export default function QuotationDetailPage() {
       />
 
       <DocumentPaper kind="QUOTATION" doc={q} settings={settings} />
+
+      <Attachments documentKind="QUOTATION" documentId={q.id} />
 
       {convertOpen && (
         <ConvertToInvoiceModal
