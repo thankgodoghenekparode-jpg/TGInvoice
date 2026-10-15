@@ -37,6 +37,7 @@ const routes = [
   'settings/reminders',
   'settings/custom-fields',
   'settings/templates',
+  'settings/import',
   'settings/profile',
   '404',
 ];

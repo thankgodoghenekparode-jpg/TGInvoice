@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, FileText, UserCog, ArrowRight, Users, BellRing, ListChecks, Palette } from 'lucide-react';
+import { Building2, FileText, UserCog, ArrowRight, Users, BellRing, ListChecks, Palette, Upload } from 'lucide-react';
 import { PageHeader, Card } from '../../components/ui.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../hooks/useSettings.js';
@@ -34,6 +34,12 @@ const SECTIONS = [
     icon: Palette,
     title: 'Document templates',
     description: 'Choose the accent colour, logo and notes printed on your invoices, quotations, receipts and credit notes.',
+  },
+  {
+    to: '/settings/import',
+    icon: Upload,
+    title: 'Import data',
+    description: 'Bring customers or your product list across from a CSV or Excel spreadsheet — with a preview before anything is saved.',
   },
   {
     to: '/settings/profile',

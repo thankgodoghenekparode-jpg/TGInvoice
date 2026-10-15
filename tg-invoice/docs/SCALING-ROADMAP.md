@@ -20,7 +20,7 @@ Legend: ✅ done · 🟡 partial · ⬜ planned
 - ✅ Recurring invoices + automated reminders (dunning) — `src/services/recurringService.js`, `src/services/reminderService.js`, `RecurringInvoice`, `ReminderRule`, `ReminderSent`; UI at `/recurring` and `/settings/reminders`
 - ✅ Attachments on documents — `src/controllers/attachmentController.js`, `src/services/attachmentService.js`, `src/services/storageService.js`, `Attachment`; UI panel on every document detail page
 - ✅ Custom fields + document templates — `src/controllers/customFieldController.js`, `src/controllers/documentTemplateController.js`, `src/services/customFieldService.js`, `src/services/templateService.js`; typed/validated values, print-on-PDF, per-kind accent/logo/bank/notes applied in `pdfService`; UI at `/settings/custom-fields`, `/settings/templates` and a panel on every detail page
-- ⬜ CSV/Excel import (customers, products) — `src/controllers/importController.js`
+- ✅ CSV/Excel import (customers, products) — `src/controllers/importController.js`, `src/services/importService.js`, `src/routes/import.routes.js`; preview-then-commit, typed validation, tenant-scoped create/update dedupe, native CSV + exceljs `.xlsx`; UI at `/settings/import`
 - ✅ Credit notes / refunds / void — `src/controllers/creditNoteController.js`, `src/controllers/refundController.js`, `CreditNote`, `Refund`; UI at `/credit-notes` and `/refunds`
 - ⬜ Referrals/affiliates + reseller/accountant program — `ReferralCode`, `Referral`, `Partner`
 - ⬜ Payments: Paystack/Flutterwave links + webhook reconciliation — `src/services/paymentGateway.js`, `paymentController.js`

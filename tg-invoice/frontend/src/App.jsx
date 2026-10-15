@@ -45,6 +45,7 @@ import DocumentSettingsPage from './pages/settings/DocumentSettings.jsx';
 import RemindersPage from './pages/settings/Reminders.jsx';
 import CustomFieldsPage from './pages/settings/CustomFields.jsx';
 import TemplatesPage from './pages/settings/Templates.jsx';
+import ImportPage from './pages/settings/Import.jsx';
 import ProfileSettingsPage from './pages/settings/ProfileSettings.jsx';
 import AdminPage from './pages/admin/Admin.jsx';
 import NotFoundPage from './pages/NotFound.jsx';
@@ -139,6 +140,7 @@ export default function App() {
           <Route path="/settings/reminders" element={<RemindersPage />} />
           <Route path="/settings/custom-fields" element={<CustomFieldsPage />} />
           <Route path="/settings/templates" element={<TemplatesPage />} />
+          <Route path="/settings/import" element={<ImportPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
         </Route>
 
