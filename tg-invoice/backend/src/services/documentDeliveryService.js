@@ -17,6 +17,12 @@ export const KIND_META = {
   INVOICE: { model: 'invoice', number: 'invoiceNumber', label: 'Invoice', include: { customer: true, items: true } },
   QUOTATION: { model: 'quotation', number: 'quotationNumber', label: 'Quotation', include: { customer: true, items: true } },
   RECEIPT: { model: 'receipt', number: 'receiptNumber', label: 'Receipt', include: { customer: true, payment: true, invoice: true } },
+  CREDIT_NOTE: {
+    model: 'creditNote',
+    number: 'creditNoteNumber',
+    label: 'Credit note',
+    include: { customer: true, items: true, invoice: { select: { id: true, invoiceNumber: true } } },
+  },
 };
 
 const VALID_CHANNELS = ['EMAIL', 'WHATSAPP', 'SMS'];

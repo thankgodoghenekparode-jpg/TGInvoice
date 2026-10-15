@@ -35,6 +35,7 @@ invoiceRouter.post('/', validate(invoiceSchema), inv.createInvoice);
 invoiceRouter.put('/:id', validate(invoiceSchema), inv.updateInvoice);
 invoiceRouter.delete('/:id', inv.deleteInvoice);
 invoiceRouter.post('/:id/cancel', inv.cancelInvoice);
+invoiceRouter.post('/:id/void', inv.voidInvoice);
 invoiceRouter.post('/:id/send', inv.markInvoiceSent);
 invoiceRouter.post('/:id/payments', validate(paymentSchema), inv.recordPayment);
 invoiceRouter.post('/:id/email', inv.invoiceEmail);

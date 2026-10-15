@@ -6,7 +6,7 @@ import { getSettings } from '../services/documentService.js';
 import { messagingStatus } from '../services/messagingService.js';
 import { KIND_META, loadDocument, deliverDocument, sanitizeChannels } from '../services/documentDeliveryService.js';
 
-const AUDIT_ACTION = { INVOICE: 'SEND_INVOICE', QUOTATION: 'SEND_QUOTATION', RECEIPT: 'SEND_RECEIPT' };
+const AUDIT_ACTION = { INVOICE: 'SEND_INVOICE', QUOTATION: 'SEND_QUOTATION', RECEIPT: 'SEND_RECEIPT', CREDIT_NOTE: 'SEND_CREDIT_NOTE' };
 
 /**
  * Delivery over WhatsApp (Cloud API) / SMS / email.
@@ -49,6 +49,9 @@ export const deliver_document = (kind) =>
     const document = await loadDocument(kind, req.params.id, req.tenant.id);
     if (kind === 'RECEIPT' && document.status === 'VOID') {
       throw errors.badRequest('This receipt has been voided and cannot be sent.');
+    }
+    if (kind === 'CREDIT_NOTE' && document.status === 'VOID') {
+      throw errors.badRequest('This credit note has been voided and cannot be sent.');
     }
 
     const channels = sanitizeChannels(req.body?.channels);

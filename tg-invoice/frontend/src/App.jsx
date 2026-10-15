@@ -32,6 +32,11 @@ import ReceiptsPage from './pages/receipts/Receipts.jsx';
 import ReceiptDetailPage from './pages/receipts/ReceiptDetail.jsx';
 import RecurringInvoicesPage from './pages/recurring/RecurringInvoices.jsx';
 import RecurringFormPage from './pages/recurring/RecurringForm.jsx';
+import CreditNotesPage from './pages/credit-notes/CreditNotes.jsx';
+import CreditNoteNewPage from './pages/credit-notes/CreditNoteForm.jsx';
+import CreditNoteEditPage from './pages/credit-notes/CreditNoteForm.jsx';
+import CreditNoteDetailPage from './pages/credit-notes/CreditNoteDetail.jsx';
+import RefundsPage from './pages/refunds/Refunds.jsx';
 import ReportsPage from './pages/Reports.jsx';
 import TeamPage from './pages/Team.jsx';
 import SettingsPage from './pages/settings/Settings.jsx';
@@ -115,6 +120,13 @@ export default function App() {
           <Route path="/recurring" element={<RecurringInvoicesPage />} />
           <Route path="/recurring/new" element={<RecurringFormPage />} />
           <Route path="/recurring/:id/edit" element={<RecurringFormPage />} />
+
+          <Route path="/credit-notes" element={<CreditNotesPage />} />
+          <Route path="/credit-notes/new" element={<CreditNoteNewPage />} />
+          <Route path="/credit-notes/:id/edit" element={<CreditNoteEditPage />} />
+          <Route path="/credit-notes/:id" element={<CreditNoteDetailPage />} />
+
+          <Route path="/refunds" element={<RefundsPage />} />
 
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/team" element={<TeamPage />} />

@@ -40,6 +40,21 @@ router.get(
         invoice: receipt.invoice,
       });
       fileName = receipt.receiptNumber;
+    } else if (kind === 'CREDIT_NOTE') {
+      const creditNote = await prisma.creditNote.findFirst({
+        where: { id, tenantId },
+        include: { customer: true, items: true, invoice: { select: { id: true, invoiceNumber: true } } },
+      });
+      if (!creditNote) throw errors.notFound('Document not found.');
+      if (creditNote.status === 'VOID') throw errors.badRequest('This credit note has been voided.');
+      buffer = await buildDocumentPdf({
+        kind: 'CREDIT_NOTE',
+        document: creditNote,
+        customer: creditNote.customer,
+        settings,
+        items: creditNote.items,
+      });
+      fileName = creditNote.creditNoteNumber;
     } else if (kind === 'QUOTATION') {
       const quotation = await prisma.quotation.findFirst({
         where: { id, tenantId },

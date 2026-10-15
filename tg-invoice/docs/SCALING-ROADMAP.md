@@ -21,6 +21,6 @@ Legend: ✅ done · 🟡 partial · ⬜ planned
 - ⬜ Attachments on documents — `src/controllers/attachmentController.js`, `Attachment`
 - ⬜ Custom fields + document templates — `CustomField`, `DocumentTemplate`
 - ⬜ CSV/Excel import (customers, products) — `src/controllers/importController.js`
-- ⬜ Credit notes / refunds / void — `src/controllers/creditNoteController.js`
+- ✅ Credit notes / refunds / void — `src/controllers/creditNoteController.js`, `src/controllers/refundController.js`, `CreditNote`, `Refund`; UI at `/credit-notes` and `/refunds`
 - ⬜ Referrals/affiliates + reseller/accountant program — `ReferralCode`, `Referral`, `Partner`
 - ⬜ Payments: Paystack/Flutterwave links + webhook reconciliation — `src/services/paymentGateway.js`, `paymentController.js`

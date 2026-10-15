@@ -81,7 +81,11 @@ function customerLines(customer) {
 
 async function drawHeader(doc, { kind, settings, number, dateLabel, dateValue, extraMeta = [] }) {
   const contentWidth = doc.page.width - PAGE_MARGIN * 2;
-  const title = kind === 'QUOTATION' ? 'QUOTATION' : kind === 'RECEIPT' ? 'RECEIPT' : 'INVOICE';
+  const title =
+    kind === 'QUOTATION' ? 'QUOTATION'
+      : kind === 'RECEIPT' ? 'RECEIPT'
+        : kind === 'CREDIT_NOTE' ? 'CREDIT NOTE'
+          : 'INVOICE';
 
   // Top accent bar
   doc.rect(0, 0, doc.page.width, 6).fill(ACCENT);
@@ -356,9 +360,9 @@ function finish(doc) {
 /* ── public API ───────────────────────────────────────────────────── */
 
 /**
- * Generate quotation / invoice PDF.
- * @param {{ kind: 'QUOTATION'|'INVOICE', document: object, customer: object,
- *           settings: object, items: Array, payments?: Array }} input
+ * Generate quotation / invoice / credit note PDF.
+ * @param {{ kind: 'QUOTATION'|'INVOICE'|'CREDIT_NOTE', document: object,
+ *           customer: object, settings: object, items: Array, payments?: Array }} input
  * @returns {Promise<Buffer>}
  */
 export async function generateDocumentPdf({ kind, document: docData, customer, settings, items }) {
@@ -366,30 +370,44 @@ export async function generateDocumentPdf({ kind, document: docData, customer, s
   doc.__settings = settings;
 
   const isInvoice = kind === 'INVOICE';
-  const number = isInvoice ? docData.invoiceNumber : docData.quotationNumber;
+  const isCredit = kind === 'CREDIT_NOTE';
+  const number = isCredit
+    ? docData.creditNoteNumber
+    : isInvoice
+      ? docData.invoiceNumber
+      : docData.quotationNumber;
 
   let y = await drawHeader(doc, {
     kind,
     settings,
     number,
-    dateLabel: isInvoice ? 'Invoice Date' : 'Quotation Date',
-    dateValue: isInvoice ? docData.invoiceDate : docData.quotationDate,
-    extraMeta: isInvoice
-      ? [['Due Date', formatDate(docData.dueDate)], ['Reference', docData.reference || '—']]
-      : [['Valid Until', formatDate(docData.validUntil)], ['Reference', docData.reference || '—']],
+    dateLabel: isCredit ? 'Credit Note Date' : isInvoice ? 'Invoice Date' : 'Quotation Date',
+    dateValue: isCredit ? docData.creditNoteDate : isInvoice ? docData.invoiceDate : docData.quotationDate,
+    extraMeta: isCredit
+      ? [['Invoice', docData.invoice?.invoiceNumber]]
+      : isInvoice
+        ? [['Due Date', formatDate(docData.dueDate)], ['Reference', docData.reference || '—']]
+        : [['Valid Until', formatDate(docData.validUntil)], ['Reference', docData.reference || '—']],
   });
 
   y = drawBillTo(doc, customer, y);
 
-  const sideLines = isInvoice
+  const creditLeft = round2(Number(docData.total) - Number(docData.amountApplied || 0));
+  const sideLines = isCredit
     ? [
-        { label: 'AMOUNT DUE', value: money(docData.balanceDue, settings), big: true, color: Number(docData.balanceDue) > 0 ? '#DC2626' : '#16A34A' },
-        { label: 'DUE DATE', value: formatDate(docData.dueDate) || '—' },
+        { label: 'CREDIT TOTAL', value: money(docData.total, settings), big: true, color: ACCENT },
+        { label: 'APPLIED', value: money(docData.amountApplied || 0, settings) },
+        { label: 'CREDIT REMAINING', value: money(creditLeft, settings) },
       ]
-    : [
-        { label: 'TOTAL', value: money(docData.total, settings), big: true, color: ACCENT },
-        { label: 'VALID UNTIL', value: formatDate(docData.validUntil) || '—' },
-      ];
+    : isInvoice
+      ? [
+          { label: 'AMOUNT DUE', value: money(docData.balanceDue, settings), big: true, color: Number(docData.balanceDue) > 0 ? '#DC2626' : '#16A34A' },
+          { label: 'DUE DATE', value: formatDate(docData.dueDate) || '—' },
+        ]
+      : [
+          { label: 'TOTAL', value: money(docData.total, settings), big: true, color: ACCENT },
+          { label: 'VALID UNTIL', value: formatDate(docData.validUntil) || '—' },
+        ];
   y = Math.max(y, drawSideBox(doc, sideLines, y - 4));
 
   y = drawItemsTable(doc, y + 6, items, settings);
@@ -406,10 +424,16 @@ export async function generateDocumentPdf({ kind, document: docData, customer, s
 
   const infoY = Math.min(y, doc.page.height - 200);
   const afterInfo = drawPaymentInfo(doc, infoY, settings);
-  drawNotesAndTerms(doc, afterInfo, { notes: docData.notes, terms: docData.terms, width: 500 });
+  drawNotesAndTerms(doc, afterInfo, {
+    notes: [docData.reason ? `Reason: ${docData.reason}` : null, docData.notes].filter(Boolean).join('\n\n'),
+    terms: docData.terms,
+    width: 500,
+  });
 
   return finish(doc);
 }
+
+const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
 
 /**
  * Generate receipt PDF (payment record — no line items).

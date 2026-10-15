@@ -11,6 +11,8 @@ const EMPTY = {
   invoicePrefix: 'INV',
   quotationPrefix: 'QT',
   receiptPrefix: 'REC',
+  creditNotePrefix: 'CN',
+  refundPrefix: 'REF',
   defaultTaxRate: 0,
   bankName: '',
   accountName: '',
@@ -37,6 +39,8 @@ export default function DocumentSettingsPage() {
       invoicePrefix: settings.invoicePrefix || 'INV',
       quotationPrefix: settings.quotationPrefix || 'QT',
       receiptPrefix: settings.receiptPrefix || 'REC',
+      creditNotePrefix: settings.creditNotePrefix || 'CN',
+      refundPrefix: settings.refundPrefix || 'REF',
       defaultTaxRate: Number(settings.defaultTaxRate) || 0,
       bankName: settings.bankName || '',
       accountName: settings.accountName || '',
@@ -110,6 +114,12 @@ export default function DocumentSettingsPage() {
             </Field>
             <Field label="Receipt prefix" error={errors.receiptPrefix} hint={`Next: ${sampleNumber(form.receiptPrefix, 'RECEIPT', 'REC')}`}>
               <input className="input uppercase" value={form.receiptPrefix} onChange={set('receiptPrefix')} disabled={!canEdit} maxLength={10} />
+            </Field>
+            <Field label="Credit note prefix" error={errors.creditNotePrefix} hint={`Next: ${sampleNumber(form.creditNotePrefix, 'CREDIT_NOTE', 'CN')}`}>
+              <input className="input uppercase" value={form.creditNotePrefix} onChange={set('creditNotePrefix')} disabled={!canEdit} maxLength={10} />
+            </Field>
+            <Field label="Refund prefix" error={errors.refundPrefix} hint={`Next: ${sampleNumber(form.refundPrefix, 'REFUND', 'REF')}`}>
+              <input className="input uppercase" value={form.refundPrefix} onChange={set('refundPrefix')} disabled={!canEdit} maxLength={10} />
             </Field>
           </div>
         </section>

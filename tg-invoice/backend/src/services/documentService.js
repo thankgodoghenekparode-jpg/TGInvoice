@@ -2,6 +2,7 @@ import { prisma } from '../prisma.js';
 import { errors, AppError } from '../utils/errors.js';
 import { sendMail } from './emailService.js';
 import { generateDocumentPdf, generateReceiptPdf } from './pdfService.js';
+import { calculateLine } from '../utils/money.js';
 import { formatMoney, formatDate, paymentMethodLabel, whatsappMessage } from '../utils/format.js';
 import { signShareToken, publicDocumentUrl } from '../utils/shareToken.js';
 
@@ -43,6 +44,12 @@ export async function buildDocumentPdf({ kind, document, customer, settings, ite
   if (kind === 'RECEIPT') {
     return generateReceiptPdf({ document, payment, customer, invoice, settings });
   }
+  if (kind === 'CREDIT_NOTE') {
+    // CreditNoteItem stores no per-line discount/tax amounts — derive them for
+    // display so the PDF columns are populated like every other document.
+    const enriched = (items || []).map((it) => ({ ...it, ...calculateLine(it) }));
+    return generateDocumentPdf({ kind, document, customer, settings, items: enriched });
+  }
   return generateDocumentPdf({ kind, document, customer, settings, items });
 }
 
@@ -71,7 +78,12 @@ export async function emailDocument({ to, subject, message, kind, pdfBuffer, fil
 }
 
 function emailHtml({ kind, message, settings, previewUrl }) {
-  const label = kind === 'QUOTATION' ? 'Quotation' : kind === 'RECEIPT' ? 'Receipt' : 'Invoice';
+  const label =
+    kind === 'QUOTATION' ? 'Quotation'
+      : kind === 'RECEIPT' ? 'Receipt'
+        : kind === 'CREDIT_NOTE' ? 'Credit note'
+          : kind === 'REFUND' ? 'Refund'
+            : 'Invoice';
   const button = previewUrl
     ? `<p style="margin:22px 0 6px"><a href="${previewUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:8px;font-size:14px;font-weight:600">View document online</a></p>`
     : '';
@@ -94,7 +106,11 @@ export function previewUrlFor({ kind, document }) {
 /** Click-to-chat share payload used by the frontend WhatsApp button. */
 export async function sharePayload({ kind, document, customer, settings }) {
   const number =
-    kind === 'QUOTATION' ? document.quotationNumber : kind === 'RECEIPT' ? document.receiptNumber : document.invoiceNumber;
+    kind === 'QUOTATION' ? document.quotationNumber
+      : kind === 'RECEIPT' ? document.receiptNumber
+        : kind === 'CREDIT_NOTE' ? document.creditNoteNumber
+          : kind === 'REFUND' ? document.refundNumber
+            : document.invoiceNumber;
   const amount = formatMoney(document.total ?? document.amount, settings);
   const previewUrl = previewUrlFor({ kind, document });
   const text = whatsappMessage({

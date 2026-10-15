@@ -54,6 +54,8 @@ function defaultPrefix(kind) {
   if (kind === 'QUOTATION') return 'QT';
   if (kind === 'RECEIPT') return 'REC';
   if (kind === 'CUSTOMER') return 'CUS';
+  if (kind === 'CREDIT_NOTE') return 'CN';
+  if (kind === 'REFUND') return 'REF';
   return 'INV';
 }
 
@@ -62,6 +64,8 @@ function currentPrefix(kind, settings) {
   if (!settings) return defaultPrefix(kind);
   if (kind === 'QUOTATION') return settings.quotationPrefix || 'QT';
   if (kind === 'RECEIPT') return settings.receiptPrefix || 'REC';
+  if (kind === 'CREDIT_NOTE') return settings.creditNotePrefix || 'CN';
+  if (kind === 'REFUND') return settings.refundPrefix || 'REF';
   return settings.invoicePrefix || 'INV';
 }
 
@@ -94,10 +98,15 @@ export async function allocateDocumentNumber(db, tenantId, kind, settings = null
 
       // Unique (tenantId, number) constraint is the last line of defence
       // (e.g. prefix changed mid-flight). Retry allocates the next value.
-      const modelKey =
-        kind === 'QUOTATION' ? 'quotation' : kind === 'RECEIPT' ? 'receipt' : kind === 'CUSTOMER' ? 'customer' : 'invoice';
-      const numberField =
-        kind === 'QUOTATION' ? 'quotationNumber' : kind === 'RECEIPT' ? 'receiptNumber' : kind === 'CUSTOMER' ? 'customerCode' : 'invoiceNumber';
+      const MODEL_BY_KIND = {
+        QUOTATION: ['quotation', 'quotationNumber'],
+        RECEIPT: ['receipt', 'receiptNumber'],
+        CUSTOMER: ['customer', 'customerCode'],
+        CREDIT_NOTE: ['creditNote', 'creditNoteNumber'],
+        REFUND: ['refund', 'refundNumber'],
+        INVOICE: ['invoice', 'invoiceNumber'],
+      };
+      const [modelKey, numberField] = MODEL_BY_KIND[kind] || MODEL_BY_KIND.INVOICE;
       const exists = await db[modelKey].findFirst({
         where: { tenantId, [numberField]: number },
         select: { id: true },
@@ -116,7 +125,7 @@ export async function allocateDocumentNumber(db, tenantId, kind, settings = null
 
 /** Seed-friendly: initialise sequence rows for a new tenant. */
 export async function initSequences(tenantId) {
-  const rows = ['CUSTOMER', 'QUOTATION', 'INVOICE', 'RECEIPT'].map((kind) => ({
+  const rows = ['CUSTOMER', 'QUOTATION', 'INVOICE', 'RECEIPT', 'CREDIT_NOTE', 'REFUND'].map((kind) => ({
     tenantId,
     kind,
     prefix: defaultPrefix(kind),

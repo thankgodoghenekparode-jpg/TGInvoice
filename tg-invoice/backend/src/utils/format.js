@@ -31,6 +31,7 @@ export const PAYMENT_METHOD_LABELS = {
   CHEQUE: 'Cheque',
   ONLINE: 'Online',
   OTHER: 'Other',
+  CREDIT_NOTE: 'Credit applied',
 };
 
 export function paymentMethodLabel(method) {
@@ -39,7 +40,12 @@ export function paymentMethodLabel(method) {
 
 /** WhatsApp click-to-chat message for a document (spec §50). */
 export function whatsappMessage({ kind, customerName, businessName, documentNumber, amount, settings, previewUrl }) {
-  const label = kind === 'QUOTATION' ? 'Quotation' : kind === 'RECEIPT' ? 'Receipt' : 'Invoice';
+  const label =
+    kind === 'QUOTATION' ? 'Quotation'
+      : kind === 'RECEIPT' ? 'Receipt'
+        : kind === 'CREDIT_NOTE' ? 'Credit note'
+          : kind === 'REFUND' ? 'Refund'
+            : 'Invoice';
   const lines = [
     `Hello ${customerName},`,
     '',

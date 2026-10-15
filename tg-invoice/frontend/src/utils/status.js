@@ -21,8 +21,27 @@ export const QUOTATION_STATUS = {
   CONVERTED: { label: 'Converted', className: 'bg-violet-50 text-violet-700 ring-violet-200' },
 };
 
+export const CREDIT_NOTE_STATUS = {
+  DRAFT: { label: 'Draft', className: 'bg-slate-100 text-slate-600 ring-slate-200' },
+  ISSUED: { label: 'Issued', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  APPLIED: { label: 'Applied', className: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
+  VOID: { label: 'Void', className: 'bg-slate-100 text-slate-500 ring-slate-200' },
+};
+
+export const REFUND_STATUS = {
+  COMPLETED: { label: 'Completed', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  VOID: { label: 'Void', className: 'bg-slate-100 text-slate-500 ring-slate-200' },
+};
+
+const STATUS_MAPS = {
+  quotation: QUOTATION_STATUS,
+  creditNote: CREDIT_NOTE_STATUS,
+  refund: REFUND_STATUS,
+  invoice: INVOICE_STATUS,
+};
+
 export const statusMeta = (status, kind = 'invoice') =>
-  (kind === 'quotation' ? QUOTATION_STATUS : INVOICE_STATUS)[status] || { label: status || '—', className: 'bg-slate-100 text-slate-600 ring-slate-200' };
+  (STATUS_MAPS[kind] || INVOICE_STATUS)[status] || { label: status || '—', className: 'bg-slate-100 text-slate-600 ring-slate-200' };
 
 /** 'quotation' → 'Quotation', 'invoice' → 'Invoice' (capitalised label). */
 export const pluralLabel = (kind) => (kind === 'quotation' ? 'Quotation' : 'Invoice');
@@ -49,6 +68,7 @@ export const PAYMENT_METHODS = [
   { value: 'OTHER', label: 'Other' },
 ];
 
-export const paymentMethodLabel = (m) => PAYMENT_METHODS.find((x) => x.value === m)?.label || m || '—';
+export const paymentMethodLabel = (m) =>
+  PAYMENT_METHODS.find((x) => x.value === m)?.label || (m === 'CREDIT_NOTE' ? 'Credit Note' : null) || m || '—';
 
 export const categoryLabel = (c) => PRODUCT_CATEGORIES.find((x) => x.value === c)?.label || c || 'Other';

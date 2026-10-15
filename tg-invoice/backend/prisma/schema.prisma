@@ -73,6 +73,9 @@ enum PaymentMethod {
   CHEQUE
   ONLINE
   OTHER
+  /// A settlement that reduces an invoice balance without cash changing hands
+  /// (a credit note applied against the invoice). Never user-selectable.
+  CREDIT_NOTE
 }
 
 enum DocumentKind {
@@ -81,6 +84,7 @@ enum DocumentKind {
   INVOICE
   RECEIPT
   CREDIT_NOTE
+  REFUND
 }
 
 // ─────────────────────────────────────────────
@@ -114,6 +118,7 @@ model User {
   createdRecurringInvoices RecurringInvoice[]       @relation("RecurringInvoiceCreator")
   uploadedAttachments      Attachment[]             @relation("AttachmentUploader")
   createdCreditNotes       CreditNote[]             @relation("CreditNoteCreator")
+  createdRefunds           Refund[]                 @relation("RefundCreator")
 
   @@index([email])
 }
@@ -155,6 +160,7 @@ model Tenant {
   customFieldValues CustomFieldValue[]
   documentTemplates DocumentTemplate[]
   creditNotes       CreditNote[]
+  refunds           Refund[]
   referralsReceived Referral[]
   paymentIntents    PaymentIntent[]
 }
@@ -277,6 +283,7 @@ model Customer {
   receipts          Receipt[]
   recurringInvoices RecurringInvoice[]
   creditNotes       CreditNote[]
+  refunds           Refund[]
 
   @@unique([tenantId, customerCode])
   @@index([tenantId])
@@ -343,6 +350,8 @@ model CompanySettings {
   invoicePrefix   String @default("INV")
   quotationPrefix String @default("QT")
   receiptPrefix   String @default("REC")
+  creditNotePrefix String @default("CN")
+  refundPrefix     String @default("REF")
 
   defaultTaxRate  Decimal @default(0) @db.Decimal(5, 2)
   defaultCurrency String  @default("NGN")
@@ -452,6 +461,8 @@ model Invoice {
   receipts         Receipt[]
   paymentIntents   PaymentIntent[]
   reminders        ReminderSent[]
+  refunds          Refund[]
+  creditNotes      CreditNote[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId])
@@ -501,6 +512,7 @@ model Payment {
   customer  Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   createdBy User?    @relation("PaymentCreator", fields: [createdById], references: [id], onDelete: SetNull)
   receipt   Receipt?
+  refunds   Refund[]
 
   @@index([tenantId])
   @@index([tenantId, invoiceId])
@@ -906,8 +918,10 @@ model CreditNote {
 
   tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer  Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoice   Invoice?         @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   createdBy User?            @relation("CreditNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
   items     CreditNoteItem[]
+  refunds   Refund[]
 
   @@unique([tenantId, creditNoteNumber])
   @@index([tenantId])
@@ -931,6 +945,49 @@ model CreditNoteItem {
   creditNote CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
 
   @@index([creditNoteId])
+}
+
+enum RefundStatus {
+  COMPLETED
+  VOID
+}
+
+/// Money paid back to a customer. Kept as its own record (never a negative
+/// Payment) so cash-out is auditable and dashboards stay honest. A refund may
+/// stand alone, or be tied to an invoice, a credit note, or a specific payment.
+model Refund {
+  id           String        @id @default(uuid()) @db.Uuid
+  tenantId     String        @db.Uuid
+  customerId   String        @db.Uuid
+  invoiceId    String?       @db.Uuid
+  creditNoteId String?       @db.Uuid
+  paymentId    String?       @db.Uuid
+  refundNumber String
+  amount       Decimal       @db.Decimal(14, 2)
+  refundDate   DateTime      @default(now())
+  method       PaymentMethod @default(BANK_TRANSFER)
+  reference    String?
+  reason       String?
+  notes        String?
+  voidReason   String?
+  status       RefundStatus  @default(COMPLETED)
+  createdById  String?       @db.Uuid
+  isDemo       Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoice    Invoice?    @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  creditNote CreditNote? @relation(fields: [creditNoteId], references: [id], onDelete: SetNull)
+  payment    Payment?    @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation("RefundCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, refundNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, createdAt])
+  @@index([invoiceId])
 }
 
 // ─────────────────────────────────────────────

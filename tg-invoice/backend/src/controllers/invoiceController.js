@@ -298,6 +298,41 @@ export const cancelInvoice = asyncHandler(async (req, res) => {
   ok(res, serialize(invoice));
 });
 
+/* ── POST /api/invoices/:id/void — nullify an issued invoice ──────────
+   Distinct from cancel: an invoice is voidable only while untouched by
+   money. Once a payment (or applied credit) exists, a credit note is the
+   correct reversal, and this endpoint refuses.                          */
+
+export const voidInvoice = asyncHandler(async (req, res) => {
+  if (!['OWNER', 'ADMIN'].includes(req.role)) throw errors.forbidden('Only owners and admins can void invoices.');
+
+  const existing = await prisma.invoice.findFirst({
+    where: { id: req.params.id, tenantId: req.tenant.id },
+    include: { payments: { select: { id: true } } },
+  });
+  if (!existing) throw errors.notFound('Invoice not found.');
+  if (existing.status === 'VOID') throw errors.badRequest('This invoice is already void.');
+  if (existing.status === 'CANCELLED') throw errors.badRequest('This invoice is cancelled.');
+  if (existing.status === 'DRAFT') throw errors.badRequest('Draft invoices can be deleted — there is nothing to void.');
+  if (existing.payments.length > 0) {
+    throw errors.badRequest('This invoice has payments recorded against it — issue a credit note instead of voiding it.');
+  }
+
+  const reason = String(req.body?.reason || '').slice(0, 500);
+  const invoice = await prisma.invoice.update({
+    where: { id: existing.id },
+    data: { status: 'VOID', voidReason: reason || null },
+  });
+
+  await logAudit({ tenantId: req.tenant.id, userId: req.user.id }, 'VOID_INVOICE', 'invoice', {
+    entityId: invoice.id,
+    entityLabel: invoice.invoiceNumber,
+    description: `${req.user.name} voided invoice ${invoice.invoiceNumber}${reason ? ` — ${reason}` : ''}`,
+  });
+
+  ok(res, serialize(invoice));
+});
+
 export const markInvoiceSent = asyncHandler(async (req, res) => {
   const existing = await prisma.invoice.findFirst({ where: { id: req.params.id, tenantId: req.tenant.id } });
   if (!existing) throw errors.notFound('Invoice not found.');

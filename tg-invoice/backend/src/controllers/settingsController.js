@@ -18,7 +18,14 @@ export const getSettings = asyncHandler(async (req, res) => {
   // The next number each sequence will hand out (used by the settings hint).
   // Prefixes come from the live settings — the sequence row only owns the counter.
   const sequences = await prisma.documentSequence.findMany({ where: { tenantId: req.tenant.id } });
-  const prefixFor = { INVOICE: settings.invoicePrefix, QUOTATION: settings.quotationPrefix, RECEIPT: settings.receiptPrefix, CUSTOMER: 'CUS' };
+  const prefixFor = {
+    INVOICE: settings.invoicePrefix,
+    QUOTATION: settings.quotationPrefix,
+    RECEIPT: settings.receiptPrefix,
+    CREDIT_NOTE: settings.creditNotePrefix,
+    REFUND: settings.refundPrefix,
+    CUSTOMER: 'CUS',
+  };
   const nextNumbers = {};
   for (const seq of sequences) nextNumbers[seq.kind] = formatNumber(prefixFor[seq.kind] || seq.prefix, seq.next);
 
@@ -30,7 +37,7 @@ const EDITABLE = [
   'businessName', 'address', 'phone', 'email', 'website', 'taxId', 'country',
   'currency', 'currencySymbol', 'currencyPosition', 'currencyDecimals', 'defaultCurrency',
   'bankName', 'accountName', 'accountNumber', 'paymentInstructions',
-  'invoicePrefix', 'quotationPrefix', 'receiptPrefix',
+  'invoicePrefix', 'quotationPrefix', 'receiptPrefix', 'creditNotePrefix', 'refundPrefix',
   'defaultTaxRate', 'defaultInvoiceNotes', 'defaultQuotationTerms', 'defaultReceiptNotes',
   'onboardingComplete', 'autoSendChannels',
 ];
@@ -49,7 +56,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
   }
 
   // Prefixes feed document numbering — keep them short and clean.
-  for (const p of ['invoicePrefix', 'quotationPrefix', 'receiptPrefix']) {
+  for (const p of ['invoicePrefix', 'quotationPrefix', 'receiptPrefix', 'creditNotePrefix', 'refundPrefix']) {
     if (data[p] != null) {
       const clean = String(data[p]).trim().toUpperCase().slice(0, 10);
       if (!/^[A-Z0-9-]*$/.test(clean)) throw errors.badRequest('Prefixes may only contain letters, numbers and dashes.');

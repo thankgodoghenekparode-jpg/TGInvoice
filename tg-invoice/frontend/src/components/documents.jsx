@@ -12,8 +12,8 @@ import { useSettings } from '../hooks/useSettings.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { Modal, Field } from './ui.jsx';
 
-const KIND_PLURAL = { QUOTATION: 'quotations', INVOICE: 'invoices', RECEIPT: 'receipts' };
-const KIND_TITLE = { QUOTATION: 'QUOTATION', INVOICE: 'INVOICE', RECEIPT: 'RECEIPT' };
+const KIND_PLURAL = { QUOTATION: 'quotations', INVOICE: 'invoices', RECEIPT: 'receipts', CREDIT_NOTE: 'credit-notes' };
+const KIND_TITLE = { QUOTATION: 'QUOTATION', INVOICE: 'INVOICE', RECEIPT: 'RECEIPT', CREDIT_NOTE: 'CREDIT NOTE' };
 
 /* ── normalizer: API entity → paper model (mirrors the PDF service) ── */
 function toPaper(kind, doc, settings) {
@@ -67,6 +67,47 @@ function toPaper(kind, doc, settings) {
       taxAmount: Number(it.taxAmount || 0),
       amount: Number(it.amount),
     }));
+
+  if (kind === 'CREDIT_NOTE') {
+    const total = Number(doc.total);
+    const applied = Number(doc.amountApplied || 0);
+    const remaining = Math.max(0, total - applied);
+    return {
+      type: kind,
+      reference: doc.creditNoteNumber,
+      date: doc.creditNoteDate,
+      dateLabel: 'Credit Note Date',
+      extraMeta: [['Against Invoice', doc.invoice?.invoiceNumber || '—']],
+      status: doc.status,
+      customer,
+      sideLines: [
+        { label: 'CREDIT TOTAL', value: money(total), big: true, color: '#2563EB' },
+        { label: 'APPLIED', value: money(applied) },
+        { label: 'REMAINING', value: money(remaining) },
+      ],
+      detailRows: [
+        ['Reason', doc.reason || '—'],
+        ...(doc.invoice?.invoiceNumber ? [['Applied to invoice', doc.invoice.invoiceNumber]] : []),
+        ['Prepared by', doc.createdBy?.name || '—'],
+      ],
+      totals: {
+        label: 'CREDIT TOTAL',
+        rows: [
+          ['Subtotal', money(doc.subtotal)],
+          ...(Number(doc.discountAmount) > 0 ? [['Discount', `-${money(doc.discountAmount)}`]] : []),
+          ...(Number(doc.taxAmount) > 0 ? [['Tax', money(doc.taxAmount)]] : []),
+        ],
+        total: doc.total,
+        showPaidBalance: false,
+      },
+      words: amountInWords(doc.total, settings),
+      notes: doc.notes || '',
+      terms: '',
+      paymentInfo: false,
+      items,
+      money,
+    };
+  }
 
   return {
     type: kind,

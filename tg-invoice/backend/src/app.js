@@ -30,6 +30,7 @@ import {
   reportRouter,
 } from './routes/document.routes.js';
 import { recurringRouter, reminderRouter } from './routes/billing.routes.js';
+import { creditNoteRouter, refundRouter } from './routes/creditNote.routes.js';
 
 const app = express();
 
@@ -81,6 +82,8 @@ app.use('/api/payments', ...scoped, paymentRouter);
 app.use('/api/reports', ...scoped, reportRouter);
 app.use('/api/recurring-invoices', ...scoped, recurringRouter);
 app.use('/api/reminder-rules', ...scoped, reminderRouter);
+app.use('/api/credit-notes', ...scoped, creditNoteRouter);
+app.use('/api/refunds', ...scoped, refundRouter);
 app.use('/api/team', ...scoped, teamRouter);
 app.use('/api/audit-logs', ...scoped, auditRouter);
 app.use('/api/search', ...scoped, searchRouter);

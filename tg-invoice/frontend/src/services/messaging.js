@@ -5,7 +5,7 @@ import { api } from './api';
  * All calls are tenant-scoped by the api client's X-Tenant-Id header.
  */
 
-const KIND_PLURAL = { QUOTATION: 'quotations', INVOICE: 'invoices', RECEIPT: 'receipts' };
+const KIND_PLURAL = { QUOTATION: 'quotations', INVOICE: 'invoices', RECEIPT: 'receipts', CREDIT_NOTE: 'credit-notes' };
 
 /** Which providers this deployment has configured (npm run worker env). */
 export const getMessagingStatus = () => api.get('/messages/status').then((res) => res.data.data);

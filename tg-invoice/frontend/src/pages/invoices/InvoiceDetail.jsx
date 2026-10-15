@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Pencil, Plus, Send, XCircle, Trash2, ReceiptText } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Send, XCircle, Trash2, ReceiptText, Ban, FileMinus } from 'lucide-react';
 import api, { apiMessage } from '../../services/api.js';
 import { useSettings } from '../../hooks/useSettings.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import {
   PageHeader, LoadingBlock, ConfirmDialog, StatusBadge, Modal, Button, Field, th, td, trHover,
@@ -15,7 +16,9 @@ export default function InvoiceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { role } = useAuth();
   const { settings, refresh, money } = useSettings();
+  const canManage = role === 'OWNER' || role === 'ADMIN';
 
   const [inv, setInv] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,8 +26,10 @@ export default function InvoiceDetailPage() {
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [voidOpen, setVoidOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [voidReason, setVoidReason] = useState('');
 
   const load = useCallback(() => {
     api
@@ -69,6 +74,21 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const voidInvoice = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/invoices/${id}/void`, { reason: voidReason });
+      toast.success('Invoice voided.');
+      setVoidOpen(false);
+      setVoidReason('');
+      load();
+    } catch (err) {
+      toast.error(apiMessage(err, 'Could not void the invoice.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteInvoice = async () => {
     setBusy(true);
     try {
@@ -98,6 +118,8 @@ export default function InvoiceDetailPage() {
   const editable = !cancelled && (inv.amountPaid === 0 || inv.amountPaid == null);
   const canPay = !cancelled && Number(inv.balanceDue) > 0;
   const payments = inv.payments || [];
+  const canVoid = canManage && !cancelled && inv.status !== 'DRAFT' && payments.length === 0;
+  const canCreditNote = !cancelled && inv.status !== 'DRAFT';
 
   return (
     <div>
@@ -126,6 +148,15 @@ export default function InvoiceDetailPage() {
                 <Send size={15} /> Mark sent
               </button>
             )}
+            {canCreditNote && (
+              <Link
+                to={`/credit-notes/new?customerId=${inv.customerId}&invoiceId=${inv.id}`}
+                className="btn btn-secondary btn-sm"
+                title="Issue a credit note against this invoice"
+              >
+                <FileMinus size={15} /> Credit note
+              </Link>
+            )}
             {!cancelled && (
               <>
                 <button
@@ -137,6 +168,17 @@ export default function InvoiceDetailPage() {
                 >
                   <XCircle size={15} /> Cancel
                 </button>
+                {canVoid && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-rose-600 hover:bg-rose-50"
+                    onClick={() => setVoidOpen(true)}
+                    disabled={busy}
+                    title="Void invoice (no payments recorded)"
+                  >
+                    <Ban size={15} /> Void
+                  </button>
+                )}
                 {inv.status === 'DRAFT' && (
                   <button
                     type="button"
@@ -276,6 +318,39 @@ export default function InvoiceDetailPage() {
         message={`Delete ${inv.invoiceNumber} permanently? Only drafts with no payments can be deleted.`}
         confirmLabel="Delete"
       />
+
+      {/* Void modal */}
+      <Modal
+        open={voidOpen}
+        onClose={() => setVoidOpen(false)}
+        title={`Void ${inv.invoiceNumber}`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setVoidOpen(false)} disabled={busy}>
+              Keep invoice
+            </Button>
+            <Button variant="danger" onClick={voidInvoice} loading={busy}>
+              Void invoice
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed text-slate-600">
+            Voiding keeps the invoice number for audit but removes it from your totals. It can only be voided
+            while no payments are recorded — otherwise issue a credit note instead.
+          </p>
+          <Field label="Reason (optional)">
+            <input
+              className="input"
+              placeholder="e.g. Duplicate of INV-00012"
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+            />
+          </Field>
+        </div>
+      </Modal>
     </div>
   );
 }

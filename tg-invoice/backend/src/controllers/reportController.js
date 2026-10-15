@@ -54,12 +54,15 @@ export const dashboard = asyncHandler(async (req, res) => {
 
   const invoiceWhere = { tenantId, status: { notIn: ['CANCELLED', 'VOID'] } };
 
-  const [invoiceAgg, paidAgg, counts, quotationCount, receiptCount, recent] = await Promise.all([
+  const [invoiceAgg, paidAgg, counts, quotationCount, receiptCount, refundAgg, recent] = await Promise.all([
     prisma.invoice.aggregate({ where: invoiceWhere, _count: { _all: true }, _sum: { total: true, balanceDue: true } }),
-    prisma.payment.aggregate({ where: { tenantId }, _sum: { amount: true } }),
+    // Cash received only — a credit note applied to an invoice is a settlement,
+    // not money in the bank, so it is excluded here (visible in the payment report).
+    prisma.payment.aggregate({ where: { tenantId, paymentMethod: { not: 'CREDIT_NOTE' } }, _sum: { amount: true } }),
     prisma.invoice.groupBy({ by: ['status'], where: { tenantId }, _count: { _all: true } }),
     prisma.quotation.count({ where: { tenantId } }),
     prisma.receipt.count({ where: { tenantId, status: 'ISSUED' } }),
+    prisma.refund.aggregate({ where: { tenantId, status: 'COMPLETED' }, _sum: { amount: true } }),
     fetchRecentDocuments(tenantId),
   ]);
 
@@ -74,6 +77,7 @@ export const dashboard = asyncHandler(async (req, res) => {
     totalInvoices: invoiceAgg._count._all,
     totalInvoiced: invoiced,
     totalPaid: paid,
+    totalRefunded: num(refundAgg._sum.amount),
     outstanding: num(invoiceAgg._sum.balanceDue),
     totalQuotations: quotationCount,
     totalReceipts: receiptCount,
@@ -132,7 +136,7 @@ async function monthlySeries(tenantId) {
       where: { tenantId, invoiceDate: { gte: start }, status: { notIn: ['CANCELLED', 'VOID', 'DRAFT'] } },
       select: { invoiceDate: true, total: true },
     }),
-    prisma.payment.findMany({ where: { tenantId, paymentDate: { gte: start } }, select: { paymentDate: true, amount: true } }),
+    prisma.payment.findMany({ where: { tenantId, paymentDate: { gte: start }, paymentMethod: { not: 'CREDIT_NOTE' } }, select: { paymentDate: true, amount: true } }),
   ]);
 
   const buckets = [];
@@ -224,9 +228,11 @@ export const paymentReport = asyncHandler(async (req, res) => {
   const tenantId = req.tenant.id;
   const range = resolveRange(req.query);
   const where = { tenantId, ...inRange('paymentDate', range) };
+  const cashWhere = { ...where, paymentMethod: { not: 'CREDIT_NOTE' } };
 
-  const [agg, byMethod, rows] = await Promise.all([
-    prisma.payment.aggregate({ where, _count: { _all: true }, _sum: { amount: true } }),
+  const [agg, creditAgg, byMethod, rows] = await Promise.all([
+    prisma.payment.aggregate({ where: cashWhere, _count: { _all: true }, _sum: { amount: true } }),
+    prisma.payment.aggregate({ where: { ...where, paymentMethod: 'CREDIT_NOTE' }, _sum: { amount: true } }),
     prisma.payment.groupBy({ by: ['paymentMethod'], where, _count: { _all: true }, _sum: { amount: true } }),
     prisma.payment.findMany({
       where,
@@ -241,7 +247,11 @@ export const paymentReport = asyncHandler(async (req, res) => {
   ]);
 
   ok(res, {
-    summary: { totalPayments: agg._count._all, totalReceived: num(agg._sum.amount) },
+    summary: {
+      totalPayments: agg._count._all,
+      totalReceived: num(agg._sum.amount),
+      totalCreditApplied: num(creditAgg._sum.amount),
+    },
     byMethod: byMethod.map((m) => ({ method: m.paymentMethod, count: m._count._all, total: num(m._sum.amount) })),
     rows: rows.map((p) => ({
       id: p.id,

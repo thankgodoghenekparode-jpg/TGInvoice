@@ -20,6 +20,8 @@ const NAV = [
     { to: '/invoices', label: 'Invoices' },
     { to: '/recurring', label: 'Recurring' },
     { to: '/receipts', label: 'Receipts' },
+    { to: '/credit-notes', label: 'Credit notes' },
+    { to: '/refunds', label: 'Refunds' },
   ] },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/products', label: 'Products & Services', icon: Package },
