@@ -30,11 +30,14 @@ import InvoiceEditPage from './pages/invoices/InvoiceForm.jsx';
 import InvoiceDetailPage from './pages/invoices/InvoiceDetail.jsx';
 import ReceiptsPage from './pages/receipts/Receipts.jsx';
 import ReceiptDetailPage from './pages/receipts/ReceiptDetail.jsx';
+import RecurringInvoicesPage from './pages/recurring/RecurringInvoices.jsx';
+import RecurringFormPage from './pages/recurring/RecurringForm.jsx';
 import ReportsPage from './pages/Reports.jsx';
 import TeamPage from './pages/Team.jsx';
 import SettingsPage from './pages/settings/Settings.jsx';
 import CompanySettingsPage from './pages/settings/CompanySettings.jsx';
 import DocumentSettingsPage from './pages/settings/DocumentSettings.jsx';
+import RemindersPage from './pages/settings/Reminders.jsx';
 import ProfileSettingsPage from './pages/settings/ProfileSettings.jsx';
 import AdminPage from './pages/admin/Admin.jsx';
 import NotFoundPage from './pages/NotFound.jsx';
@@ -109,12 +112,17 @@ export default function App() {
           <Route path="/receipts" element={<ReceiptsPage />} />
           <Route path="/receipts/:id" element={<ReceiptDetailPage />} />
 
+          <Route path="/recurring" element={<RecurringInvoicesPage />} />
+          <Route path="/recurring/new" element={<RecurringFormPage />} />
+          <Route path="/recurring/:id/edit" element={<RecurringFormPage />} />
+
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/team" element={<TeamPage />} />
 
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/company" element={<CompanySettingsPage />} />
           <Route path="/settings/documents" element={<DocumentSettingsPage />} />
+          <Route path="/settings/reminders" element={<RemindersPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
         </Route>
 

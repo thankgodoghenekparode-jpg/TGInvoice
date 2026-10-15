@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Building2, FileText, UserCog, ArrowRight, Users } from 'lucide-react';
+import { Building2, FileText, UserCog, ArrowRight, Users, BellRing } from 'lucide-react';
 import { PageHeader, Card } from '../../components/ui.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../hooks/useSettings.js';
@@ -16,6 +16,12 @@ const SECTIONS = [
     icon: FileText,
     title: 'Documents & payments',
     description: 'Numbering prefixes, default tax rate, notes, terms and the bank details clients pay into.',
+  },
+  {
+    to: '/settings/reminders',
+    icon: BellRing,
+    title: 'Payment reminders',
+    description: 'Chase unpaid invoices automatically — before, on, or after the due date, by WhatsApp, SMS or email.',
   },
   {
     to: '/settings/profile',

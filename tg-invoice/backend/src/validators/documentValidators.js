@@ -49,6 +49,9 @@ const documentBase = {
   saveCustomItems: z.boolean().optional().default(true),
 };
 
+/** Reusable line-item schema (quotations, invoices, recurring templates). */
+export const lineItemSchema = baseItem;
+
 export const quotationSchema = z.object({
   ...documentBase,
   quotationDate: z.coerce.date({ errorMap: () => ({ message: 'Enter a valid quotation date.' }) }),

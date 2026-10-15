@@ -47,13 +47,21 @@ export function paged(rows, total, page, limit) {
   };
 }
 
-/** Case-insensitive search term → { field: { contains, mode: 'insensitive' } } filters. */
+/** Case-insensitive search term → { field: { contains, mode: 'insensitive' } } filters.
+ *  Dotted paths address relations (`customer.name` → `{ customer: { name: … } }`). */
 export function searchFilter(term, fields) {
   if (!term || !String(term).trim()) return {};
   const q = String(term).trim();
   return {
-    OR: fields.map((f) => ({ [f]: { contains: q, mode: 'insensitive' } })),
+    OR: fields.map((f) => nestField(f, { contains: q, mode: 'insensitive' })),
   };
+}
+
+function nestField(path, leaf) {
+  const parts = String(path).split('.');
+  let node = leaf;
+  for (let i = parts.length - 1; i >= 0; i -= 1) node = { [parts[i]]: node };
+  return node;
 }
 
 export const ok = (res, data = null, meta = undefined) =>

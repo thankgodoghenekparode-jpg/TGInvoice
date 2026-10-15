@@ -18,6 +18,7 @@ const NAV = [
   { label: 'Documents', icon: FileText, children: [
     { to: '/quotations', label: 'Quotations' },
     { to: '/invoices', label: 'Invoices' },
+    { to: '/recurring', label: 'Recurring' },
     { to: '/receipts', label: 'Receipts' },
   ] },
   { to: '/customers', label: 'Customers', icon: Users },
