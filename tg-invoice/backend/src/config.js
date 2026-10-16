@@ -82,6 +82,10 @@ const config = {
     provider: process.env.PAYMENT_PROVIDER || '', // paystack | flutterwave
     publicKey: process.env.PAYMENT_PUBLIC_KEY || '',
     secretKey: process.env.PAYMENT_SECRET_KEY || '',
+    // Provider-specific overrides — win over the generic PAYMENT_SECRET_KEY,
+    // so both gateways can be keyed at once if you switch between them.
+    paystackSecretKey: process.env.PAYSTACK_SECRET_KEY || '',
+    flutterwaveSecretKey: process.env.FLUTTERWAVE_SECRET_KEY || '',
     webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET || '',
     callbackUrl: process.env.PAYMENT_CALLBACK_URL || '',
   },

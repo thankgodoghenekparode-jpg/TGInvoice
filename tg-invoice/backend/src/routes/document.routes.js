@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { validate } from '../middleware/errorHandler.js';
-import { quotationSchema, invoiceSchema, paymentSchema } from '../validators/documentValidators.js';
+import { quotationSchema, invoiceSchema, paymentSchema, createPaymentLinkSchema } from '../validators/documentValidators.js';
 import * as q from '../controllers/quotationController.js';
 import * as inv from '../controllers/invoiceController.js';
 import * as receipts from '../controllers/receiptController.js';
@@ -38,6 +38,11 @@ invoiceRouter.post('/:id/cancel', inv.cancelInvoice);
 invoiceRouter.post('/:id/void', inv.voidInvoice);
 invoiceRouter.post('/:id/send', inv.markInvoiceSent);
 invoiceRouter.post('/:id/payments', validate(paymentSchema), inv.recordPayment);
+// Hosted checkout (Paystack/Flutterwave) — the gateway webhook settles these.
+invoiceRouter.get('/:id/payment-links', payments.listPaymentLinks);
+invoiceRouter.post('/:id/payment-link', validate(createPaymentLinkSchema), payments.createPaymentLink);
+invoiceRouter.post('/:id/payment-links/:intentId/verify', payments.verifyPaymentLink);
+invoiceRouter.post('/:id/payment-links/:intentId/cancel', payments.cancelPaymentLink);
 invoiceRouter.post('/:id/email', inv.invoiceEmail);
 invoiceRouter.get('/:id/share', inv.invoiceShare);
 invoiceRouter.post('/:id/deliver', messaging.deliver_document('INVOICE'));

@@ -11,6 +11,7 @@ import {
 import { DocumentPaper, DocumentActions, RecordPaymentModal } from '../../components/documents.jsx';
 import Attachments from '../../components/Attachments.jsx';
 import CustomFieldsPanel from '../../components/CustomFieldsPanel.jsx';
+import PaymentLinks from '../../components/PaymentLinks.jsx';
 import { formatDateTime, formatDate } from '../../utils/dates.js';
 import { paymentMethodLabel } from '../../utils/status.js';
 
@@ -267,6 +268,10 @@ export default function InvoiceDetailPage() {
       </section>
 
       <Attachments documentKind="INVOICE" documentId={inv.id} />
+
+      {inv.status !== 'DRAFT' && (
+        <PaymentLinks invoice={inv} onSettled={load} />
+      )}
 
       <CustomFieldsPanel entity="INVOICE" entityId={inv.id} />
 

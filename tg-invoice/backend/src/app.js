@@ -35,6 +35,7 @@ import { attachmentRouter } from './routes/attachment.routes.js';
 import { customFieldRouter, documentTemplateRouter } from './routes/customization.routes.js';
 import { importRouter } from './routes/import.routes.js';
 import { referralRouter } from './routes/referral.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
 
 const app = express();
 
@@ -43,7 +44,16 @@ app.set('trust proxy', 1);
 
 app.use(securityHeaders);
 app.use(corsOptions);
-app.use(express.json({ limit: '1mb' }));
+// `verify` keeps the untouched bytes so gateway webhooks can HMAC their raw
+// body (paymentGateway.verifySignature) before the JSON is trusted.
+app.use(
+  express.json({
+    limit: '1mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(cookieParser());
 app.use('/api', apiLimiter);
 
@@ -69,6 +79,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/team/invitations', invitationRouter);
 // Public document links: the signed, expiring token is the credential.
 app.use('/api/public', publicRoutes);
+// Gateway webhooks: the provider HMAC over the raw body is the credential.
+app.use('/api/webhooks', webhookRoutes);
 
 /* ── Tenant-scoped routes ─────────────────────────────────────────── */
 /* Every one of these runs: JWT → membership check → tenant context.

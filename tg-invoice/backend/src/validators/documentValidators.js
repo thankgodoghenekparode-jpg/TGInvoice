@@ -74,3 +74,10 @@ export const paymentSchema = z.object({
   reference: z.string().trim().max(120).optional().or(z.literal('')),
   notes: z.string().trim().max(1000).optional().or(z.literal('')),
 });
+
+/** Body for POST /api/invoices/:id/payment-link — hosted checkout session. */
+export const createPaymentLinkSchema = z.object({
+  provider: z.enum(['paystack', 'flutterwave']).optional(),
+  // Omit to charge the full outstanding balance.
+  amount: z.coerce.number().positive('Payment amount must be greater than 0.').max(99_999_999_999).optional(),
+});

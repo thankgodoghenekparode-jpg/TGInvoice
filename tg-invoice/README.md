@@ -241,7 +241,7 @@ Open <http://localhost:5173> and sign in with a demo account (section 6).
 | `RATE_LIMIT_PER_TENANT` / `RATE_LIMIT_TENANT_WINDOW_MS` | – | Per-business request budget (default `600` per `60000` ms) so one noisy tenant cannot starve others. |
 | `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_API_VERSION` / `WHATSAPP_BUSINESS_NUMBER` | – | WhatsApp Cloud API credentials for automatic document/reminder delivery. **Unset = WhatsApp sending disabled** (shares fall back to the `wa.me` link, as today). |
 | `SMS_PROVIDER` (`termii` \| `africas_talking` \| `twilio`) / `SMS_API_KEY` / `SMS_SENDER_ID` / `SMS_FROM` / `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | – | SMS delivery. **Unset = SMS disabled.** |
-| `PAYMENT_PROVIDER` (`paystack` \| `flutterwave`) / `PAYMENT_PUBLIC_KEY` / `PAYMENT_SECRET_KEY` / `PAYMENT_WEBHOOK_SECRET` / `PAYMENT_CALLBACK_URL` | – | Online payment links + webhook reconciliation. **Unset = payment links disabled.** |
+| `PAYMENT_PROVIDER` (`paystack` \| `flutterwave`) / `PAYMENT_PUBLIC_KEY` / `PAYMENT_SECRET_KEY` / `PAYMENT_WEBHOOK_SECRET` / `PAYMENT_CALLBACK_URL` | – | Online payment links + webhook reconciliation. `PAYMENT_SECRET_KEY` works for either gateway; the provider-specific `PAYSTACK_SECRET_KEY` / `FLUTTERWAVE_SECRET_KEY` win when both are set. Point the gateway's webhook at `<PUBLIC_BASE_URL>/api/webhooks/paystack` (or `/flutterwave`). **Unset = payment links disabled** and the app runs normally without them. |
 | `POSTHOG_KEY` / `POSTHOG_HOST` | – | Backend-side analytics. The frontend reads `VITE_POSTHOG_*` instead. |
 | `APP_URL` | – | Public web-app URL used for referral links (defaults to `FRONTEND_URL`). |
 
