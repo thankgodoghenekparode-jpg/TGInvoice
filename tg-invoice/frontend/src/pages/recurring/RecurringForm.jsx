@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, Field, LoadingBlock, Modal, Select } from '../../components/ui.jsx';
 import LineItems, { blankRow } from '../../components/LineItems.jsx';
 import { todayInput, dateInputValue, formatDate } from '../../utils/dates.js';
+import { track, EVENTS } from '../../services/events.js';
 
 const INTERVAL_UNITS = {
   WEEKLY: 'week(s)',
@@ -182,6 +183,7 @@ export default function RecurringFormPage() {
         toast.success('Schedule updated.');
       } else {
         await recurringApi.create(payload);
+        track(EVENTS.RECURRING_CREATED, { frequency: payload.frequency, autoSend: payload.autoSend });
         toast.success('Schedule created. The first invoice is raised on its start date.');
       }
       navigate('/recurring');

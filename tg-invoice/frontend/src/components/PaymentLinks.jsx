@@ -4,6 +4,7 @@ import { apiMessage } from '../services/api.js';
 import {
   cancelPaymentLink, createPaymentLink, listPaymentLinks, verifyPaymentLink,
 } from '../services/payments.js';
+import { track, EVENTS } from '../services/events.js';
 import { useSettings } from '../hooks/useSettings.js';
 import { useToast } from '../context/ToastContext.jsx';
 import {
@@ -74,6 +75,7 @@ export default function PaymentLinks({ invoice, onSettled }) {
     setBusy(true);
     try {
       const intent = await createPaymentLink(invoice.id, amount === '' ? {} : { amount: Number(amount) });
+      track(EVENTS.PAYMENT_LINK_CREATED, { provider: intent.provider, partial: amount !== '' });
       setCreateOpen(false);
       setAmount('');
       setShared(intent);

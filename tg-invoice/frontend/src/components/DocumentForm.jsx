@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { PageHeader, Field, LoadingBlock, Modal } from './ui.jsx';
 import LineItems, { blankRow } from './LineItems.jsx';
 import { todayInput, dateInputValue } from '../utils/dates.js';
+import { track, EVENTS } from '../services/events.js';
 
 const STATUS_OPTIONS = {
   QUOTATION: [
@@ -190,6 +191,11 @@ export default function DocumentForm({ kind }) {
         navigate(`${base}/${data.data.id}`);
       } else {
         const { data } = await api.post(base, payload);
+        track(isInvoice ? EVENTS.INVOICE_CREATED : EVENTS.QUOTATION_CREATED, {
+          status: payload.status,
+          lineItems: payload.items.length,
+          fromProduct: payload.items.some((it) => Boolean(it.productId)),
+        });
         toast.success(`${isInvoice ? 'Invoice' : 'Quotation'} ${data.data[isInvoice ? 'invoiceNumber' : 'quotationNumber']} created.`);
         navigate(`${base}/${data.data.id}`);
       }

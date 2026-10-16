@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { apiMessage, apiFieldErrors } from '../../services/api.js';
 import { lookupReferralCode } from '../../services/referrals.js';
+import { track, EVENTS } from '../../services/events.js';
 import { useDebounced } from '../../hooks/useList.js';
 import { CURRENCY_PRESETS } from '../../utils/currency.js';
 import AuthLayout from './AuthLayout.jsx';
@@ -65,6 +66,7 @@ export default function RegisterPage() {
     setErrors({});
     try {
       const preset = CURRENCY_PRESETS.find((c) => c.code === form.business.currency) || CURRENCY_PRESETS[0];
+      const referred = Boolean(form.referralCode.trim());
       await register({
         name: form.name.trim(),
         email: form.email.trim(),
@@ -78,6 +80,7 @@ export default function RegisterPage() {
           currency: { code: preset.code, symbol: preset.symbol, position: 'prefix' },
         },
       });
+      track(EVENTS.SIGNED_UP, { referred, currency: preset.code, country: form.business.country });
       toast.success('Account created. Let’s set up your business.');
       navigate('/onboarding', { replace: true });
     } catch (err) {

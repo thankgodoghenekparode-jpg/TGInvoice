@@ -3,6 +3,7 @@ import { Download, Printer, Share2, Mail, X, Plus, AlertTriangle, ArrowRightLeft
 import { api, apiMessage, apiFieldErrors } from '../services/api.js';
 import { downloadPdf, printPdf } from '../services/files.js';
 import { shareDocument, pdfFileName } from '../services/share.js';
+import { track, EVENTS } from '../services/events.js';
 import { getMessagingStatus, deliverDocument } from '../services/messaging.js';
 import { formatMoney, amountInWords } from '../utils/currency.js';
 import { formatDate } from '../utils/dates.js';
@@ -456,6 +457,9 @@ export function DocumentActions({ kind, id, reference, customer, subjectPrefix, 
       if (result === 'whatsapp') {
         toast.info('The PDF was saved — attach it in WhatsApp to send the file itself.', 'Share');
       }
+      if (result && result !== 'cancelled') {
+        track(EVENTS.DOCUMENT_SHARED, { kind, method: result });
+      }
     } catch (err) {
       toast.error(apiMessage(err, 'Could not share the document.'));
     } finally {
@@ -763,6 +767,7 @@ export function RecordPaymentModal({ invoice, onClose, onRecorded }) {
         { ...form, amount: Number(form.amount) },
         { headers: { 'X-Tenant-Id': activeTenant.id } }
       );
+      track(EVENTS.PAYMENT_RECORDED, { method: form.paymentMethod });
       toast.success(`Payment recorded — receipt ${data.data.receipt.receiptNumber} generated.`);
       onRecorded?.(data.data);
       onClose();

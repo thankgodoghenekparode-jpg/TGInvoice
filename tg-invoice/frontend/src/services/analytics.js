@@ -33,12 +33,10 @@ export function initAnalytics() {
 
   window.posthog.init(key, {
     api_host: `https://${host}`,
-    capture_pageview: false, // SPAs have no reload per route — we page-view manually
+    capture_pageview: false, // SPAs have no reload per route — App.jsx owns pageviews
     persistence: 'localStorage',
     person_profiles: 'identified_only',
   });
-
-  capture('$pageview');
 }
 
 /** Record an event. Never throws. */

@@ -14,6 +14,7 @@ import CustomFieldsPanel from '../../components/CustomFieldsPanel.jsx';
 import PaymentLinks from '../../components/PaymentLinks.jsx';
 import { formatDateTime, formatDate } from '../../utils/dates.js';
 import { paymentMethodLabel } from '../../utils/status.js';
+import { track, EVENTS } from '../../services/events.js';
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -60,7 +61,11 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  const markSent = () => act(() => api.post(`/invoices/${id}/send`), 'Invoice marked as sent.');
+  const markSent = () =>
+    act(async () => {
+      await api.post(`/invoices/${id}/send`);
+      track(EVENTS.INVOICE_SENT);
+    }, 'Invoice marked as sent.');
 
   const cancelInvoice = async () => {
     setBusy(true);

@@ -4,6 +4,7 @@ import { apiMessage } from '../services/api.js';
 import {
   createReferralCode, deleteReferralCode, getReferralOverview, updateReferralCode,
 } from '../services/referrals.js';
+import { track, EVENTS } from '../services/events.js';
 import { useSettings } from '../hooks/useSettings.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -108,6 +109,7 @@ export default function ReferralsPage() {
         toast.success('Referral code updated.');
       } else {
         await createReferralCode(payload);
+        track(EVENTS.REFERRAL_CODE_CREATED, { rewardType: payload.rewardType });
         toast.success('Referral code created — share it to start earning.');
       }
       setEditing(null);

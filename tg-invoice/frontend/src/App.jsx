@@ -1,8 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { RequireAuth, PublicOnly, RequiresSetup, RequirePlatformAdmin } from './components/guards.jsx';
 import { Toaster } from './components/ui.jsx';
 import { useToast } from './context/ToastContext.jsx';
 import AppShell from './components/layout.jsx';
+import { track, EVENTS } from './services/events.js';
 
 import LandingPage from './pages/Landing.jsx';
 import LoginPage from './pages/auth/Login.jsx';
@@ -51,10 +53,25 @@ import ProfileSettingsPage from './pages/settings/ProfileSettings.jsx';
 import AdminPage from './pages/admin/Admin.jsx';
 import NotFoundPage from './pages/NotFound.jsx';
 
+/**
+ * One PostHog pageview per SPA navigation. Rendering this inside <Routes> is
+ * not possible (it would remount per route), so it sits above them and reacts
+ * to the location. Path only — no ids, no query strings (they can carry
+ * tokens); the route pattern is enough to build funnels.
+ */
+function RouteAnalytics() {
+  const location = useLocation();
+  useEffect(() => {
+    track(EVENTS.PAGEVIEW, { path: location.pathname });
+  }, [location.pathname]);
+  return null;
+}
+
 export default function App() {
   const { toasts, dismiss } = useToast();
   return (
     <>
+      <RouteAnalytics />
       <Routes>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />

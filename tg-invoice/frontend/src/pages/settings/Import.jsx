@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { CheckCircle2, Download, FileSpreadsheet, RotateCcw, Upload, XCircle } from 'lucide-react';
 import { apiMessage } from '../../services/api.js';
 import { IMPORT_TYPES, previewImport, runImport, downloadTemplate } from '../../services/imports.js';
+import { track, EVENTS } from '../../services/events.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, Badge, Button, Card, CardHeader, Tabs } from '../../components/ui.jsx';
 
@@ -64,6 +65,7 @@ export default function ImportPage() {
       setResult(data);
       setPlan(null);
       const saved = data.created + data.updated;
+      track(EVENTS.IMPORT_COMMITTED, { type, created: data.created, updated: data.updated });
       toast.success(`Imported ${saved} row${saved === 1 ? '' : 's'}.`);
     } catch (err) {
       toast.error(apiMessage(err, 'Could not import this file.'));
